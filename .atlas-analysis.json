@@ -1,0 +1,103 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "AI Translations for Laravel",
+  "projectDescription": "A Laravel package that automatically translates Laravel language files using LLMs with high accuracy and context awareness.",
+  "theme": "mint",
+  "primaryColor": "#FF2D20",
+  "lightColor": "#FFC6BD",
+  "darkColor": "#C51A0B",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/llm-providers",
+              "configuration/languages"
+            ]
+          },
+          {
+            "group": "Usage",
+            "pages": [
+              "usage/translating",
+              "usage/validation",
+              "usage/interactive-mode",
+              "usage/advanced-options"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/how-it-works",
+              "concepts/translation-strategies",
+              "concepts/context-awareness"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/basic-translation",
+              "examples/partial-updates",
+              "examples/multi-language"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "api/commands/translate",
+              "api/commands/validate"
+            ]
+          },
+          {
+            "group": "Classes",
+            "pages": [
+              "api/classes/translator",
+              "api/classes/translation-file",
+              "api/classes/translation-agent"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api/config/reference"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "AI-powered translation of Laravel language files using multiple LLM providers",
+    "Context-aware translations that maintain consistency and terminology",
+    "Smart detection and translation of only missing keys without full regeneration",
+    "Interactive chat mode for translation refinement and quality control",
+    "Comprehensive validation tools to ensure translation completeness",
+    "Support for OpenAI, Anthropic (Claude), and Gemini models",
+    "Preserves nested array structure with dot notation access",
+    "Fast mode option for quicker translations"
+  ],
+  "publicApiSurface": [
+    "php artisan translate",
+    "php artisan translate:validate",
+    "Mateffy\\AiTranslations\\Translator",
+    "Mateffy\\AiTranslations\\TranslationFile",
+    "Mateffy\\AiTranslations\\TranslationAgent",
+    "config/ai-translations.php"
+  ]
+}
