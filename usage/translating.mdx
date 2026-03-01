@@ -1,0 +1,130 @@
+---
+title: Translating Files
+description: Learn how to translate your Laravel language files using AI
+---
+
+The `translate` command is the primary tool for translating your Laravel application's language files using AI. It intelligently detects missing translations and generates contextually appropriate translations for your target languages.
+
+## Basic Usage
+
+Run the translate command without any options to translate all configured languages:
+
+```bash
+php artisan translate
+```
+
+This will:
+
+<Steps>
+  <Step title="Detect missing translations">
+    The command compares your source language files with target language files to identify missing keys.
+  </Step>
+  
+  <Step title="Generate translations with AI">
+    Uses your configured LLM to generate contextually appropriate translations.
+  </Step>
+  
+  <Step title="Write translations to files">
+    Automatically merges the new translations into your existing language files.
+  </Step>
+</Steps>
+
+## Example Output
+
+Here's what you'll see when running the translate command:
+
+```bash
+AI Translator
+Model: anthropic/claude-3-haiku-20240307
+Source: de
+Languages: cn, en, es, fr, it, pl
+Domains: test
+
+Translating from de to en: test
+Generated translations for test from de to en:
+okay_what_about_this.key: Okay, what about this?
+okay_what_about_this.key2: Okay, what about this?
+okay_what_about_this.key3: Okay, what about this?
+...
+```
+
+## Translate Specific Files
+
+Use the `--name` option to translate only specific language files:
+
+```bash
+php artisan translate --name=validation
+```
+
+You can also translate multiple files by separating them with commas:
+
+```bash
+php artisan translate --name=validation,auth,passwords
+```
+
+## Translate to Specific Languages
+
+Use the `--language` option to translate to specific target languages only:
+
+```bash
+php artisan translate --language=fr
+```
+
+Translate to multiple languages:
+
+```bash
+php artisan translate --language=fr,es,de
+```
+
+## Change Source Language
+
+By default, the package uses your application's locale (from `config/app.php`) as the source language. You can override this with the `--base-language` option:
+
+```bash
+php artisan translate --base-language=en
+```
+
+This is useful when you want to translate from a language other than your default locale.
+
+## Combining Options
+
+You can combine multiple options for precise control:
+
+```bash
+php artisan translate --name=auth --language=fr,es --base-language=en
+```
+
+This command will:
+- Only translate the `auth` language file
+- Only translate to French and Spanish
+- Use English as the source language
+
+## How It Works
+
+<Note>
+The translation system provides the complete source and target language files to the LLM for full context. This ensures consistency in terminology and style across your application.
+</Note>
+
+The workflow:
+
+1. **Context Loading**: Both source and target language files are loaded into memory with their full nested structure
+2. **Missing Key Detection**: The system compares files to identify which translations are missing
+3. **AI Translation**: The LLM receives complete context and returns only the missing translations using dot notation
+4. **Smart Merging**: New translations are merged into existing files without regenerating everything
+
+This approach allows you to:
+- Add new languages without starting from scratch
+- Update existing translations incrementally
+- Maintain manual edits and customizations
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Interactive Mode" icon="comments" href="/usage/interactive-mode">
+    Learn how to refine translations interactively
+  </Card>
+  
+  <Card title="Advanced Options" icon="sliders" href="/usage/advanced-options">
+    Explore advanced flags for power users
+  </Card>
+</CardGroup>

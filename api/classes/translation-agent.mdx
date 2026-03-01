@@ -1,0 +1,397 @@
+---
+title: TranslationAgent
+description: AI agent that communicates with language models to perform translations
+---
+
+## Overview
+
+The `TranslationAgent` class extends NeuronAI's `Agent` class to provide specialized AI-powered translation capabilities. It handles communication with various AI providers (OpenAI, Anthropic, Gemini) and processes translation requests in optimized chunks.
+
+**Namespace**: `Mateffy\AiTranslations`
+
+**Extends**: `NeuronAI\Agent`
+
+## Class Definition
+
+```php
+namespace Mateffy\AiTranslations;
+
+use Closure;
+use NeuronAI\Agent;
+use NeuronAI\Chat\Messages\UserMessage;
+use NeuronAI\Providers\Anthropic\Anthropic;
+use NeuronAI\Providers\OpenAI\OpenAI;
+use NeuronAI\Providers\Gemini\Gemini;
+use NeuronAI\Providers\AIProviderInterface;
+use NeuronAI\StructuredOutput\JsonExtractor;
+use NeuronAI\StructuredOutput\JsonSchema;
+
+class TranslationAgent extends Agent
+{
+    public readonly int $chunkSize = 35;
+    
+    // ...
+}
+```
+
+## Constructor
+
+```php
+public function __construct(
+    protected TranslationFile $from,
+    protected TranslationFile $to,
+    protected bool $fast = false,
+    public readonly int $chunkSize = 35,
+)
+```
+
+<ParamField path="from" type="TranslationFile" required>
+  The source translation file containing original translations
+</ParamField>
+
+<ParamField path="to" type="TranslationFile" required>
+  The target translation file where translations will be generated
+</ParamField>
+
+<ParamField path="fast" type="bool" default="false">
+  Whether to use fast model variants (e.g., GPT-4o-mini instead of GPT-4o)
+</ParamField>
+
+<ParamField path="chunkSize" type="int" default="35">
+  Number of translation keys to process per AI request. Lower values reduce token usage but increase API calls.
+</ParamField>
+
+## Properties
+
+<ResponseField name="from" type="TranslationFile" readonly>
+  The source translation file
+</ResponseField>
+
+<ResponseField name="to" type="TranslationFile" readonly>
+  The target translation file
+</ResponseField>
+
+<ResponseField name="fast" type="bool" readonly>
+  Fast mode flag
+</ResponseField>
+
+<ResponseField name="chunkSize" type="int" readonly>
+  Maximum number of keys processed per request
+</ResponseField>
+
+## Methods
+
+### provider()
+
+Resolves and returns the configured AI provider instance.
+
+```php
+protected function provider(): AIProviderInterface
+```
+
+<ResponseField name="AIProviderInterface" type="AIProviderInterface">
+  An instance of the configured AI provider (OpenAI, Anthropic, or Gemini)
+</ResponseField>
+
+#### Supported Providers
+
+- **OpenAI**: Uses models from `ai-translations.openai.model` or `ai-translations.openai.fast_model`
+- **Anthropic**: Uses models from `ai-translations.anthropic.model` or `ai-translations.anthropic.fast_model`
+- **Gemini**: Uses models from `ai-translations.gemini.model` or `ai-translations.gemini.fast_model`
+
+#### Configuration
+
+Set the provider in your `config/ai-translations.php`:
+
+```php
+return [
+    'provider' => 'openai', // or 'anthropic', 'gemini'
+    
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'model' => 'gpt-4o',
+        'fast_model' => 'gpt-4o-mini',
+    ],
+    
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        'model' => 'claude-3-5-sonnet-20241022',
+        'fast_model' => 'claude-3-5-haiku-20241022',
+    ],
+    
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => 'gemini-2.0-flash-exp',
+        'fast_model' => 'gemini-2.0-flash-exp',
+    ],
+];
+```
+
+---
+
+### instructions()
+
+Generates the system prompt that instructs the AI on how to perform translations.
+
+```php
+public function instructions(): string
+```
+
+<ResponseField name="string" type="string">
+  The system prompt used to instruct the AI model
+</ResponseField>
+
+#### Key Instructions
+
+The generated prompt instructs the AI to:
+- Translate Laravel language files from source to target language
+- Output only structured JSON via the `translate` tool
+- Reuse existing translations when available for consistency
+- Handle dot-notated keys properly
+- Avoid double-escaping characters
+- Translate ALL keys without skipping
+
+---
+
+### getOutputClass()
+
+Returns the DTO class used for structured output.
+
+```php
+protected function getOutputClass(): string
+```
+
+<ResponseField name="string" type="string">
+  Returns `TranslationsDTO::class`
+</ResponseField>
+
+---
+
+### runTranslation()
+
+Executes the translation workflow using AI, processing keys in chunks.
+
+```php
+public function runTranslation(
+    array $missing, 
+    bool $retry = false,
+    ?Closure $progress = null
+): array
+```
+
+<ParamField path="missing" type="array" required>
+  Array of dot-notated translation keys that need translation (e.g., `['auth.failed', 'validation.required']`)
+</ParamField>
+
+<ParamField path="retry" type="bool" default="false">
+  Whether this is a retry attempt. When `true`, sends a simplified prompt without full file context to save tokens.
+</ParamField>
+
+<ParamField path="progress" type="?Closure" default="null">
+  Optional callback function with signature: `function(int $index, int $total): void`
+  
+  - `$index`: Current chunk index being processed
+  - `$total`: Total number of chunks
+</ParamField>
+
+<ResponseField name="array" type="array<string, string>">
+  Associative array of translated keys and values in dot notation format
+</ResponseField>
+
+#### Process Flow
+
+1. Splits missing keys into chunks (default: 35 keys per chunk)
+2. For each chunk:
+   - Generates a JSON schema requiring all keys in the chunk
+   - Sends prompt to AI with context (full file on first request, minimal on retries)
+   - Extracts structured JSON response
+   - Accumulates translations
+   - Calls progress callback if provided
+3. Returns all accumulated translations
+
+#### Example
+
+<CodeGroup>
+```php Basic Usage
+use Mateffy\AiTranslations\TranslationAgent;
+use Mateffy\AiTranslations\TranslationFile;
+
+$from = TranslationFile::load('en', 'validation');
+$to = TranslationFile::load('es', 'validation');
+
+$agent = new TranslationAgent(
+    from: $from,
+    to: $to,
+    fast: false
+);
+
+$missingKeys = ['validation.required', 'validation.email'];
+
+$translations = $agent->runTranslation($missingKeys);
+
+// Result: [
+//   'validation.required' => 'El campo :attribute es obligatorio.',
+//   'validation.email' => 'El campo :attribute debe ser un correo válido.'
+// ]
+```
+
+```php With Progress Tracking
+use Mateffy\AiTranslations\TranslationAgent;
+use Mateffy\AiTranslations\TranslationFile;
+
+$from = TranslationFile::load('en', 'messages');
+$to = TranslationFile::load('fr', 'messages');
+
+$agent = new TranslationAgent(
+    from: $from,
+    to: $to,
+    fast: true,
+    chunkSize: 20
+);
+
+$missingKeys = $from->compare($to);
+
+$translations = $agent->runTranslation(
+    missing: $missingKeys,
+    retry: false,
+    progress: function (int $index, int $total) {
+        echo "Processing chunk " . ($index + 1) . " of {$total}\n";
+    }
+);
+
+foreach ($translations as $key => $value) {
+    echo "{$key}: {$value}\n";
+}
+```
+
+```php Retry Logic
+use Mateffy\AiTranslations\TranslationAgent;
+use Mateffy\AiTranslations\TranslationFile;
+
+$from = TranslationFile::load('en', 'auth');
+$to = TranslationFile::load('de', 'auth');
+
+$agent = new TranslationAgent(from: $from, to: $to);
+
+$missingKeys = ['auth.failed', 'auth.throttle', 'auth.password'];
+
+// First attempt with full context
+$translations = $agent->runTranslation($missingKeys, retry: false);
+
+// Check for missing translations
+$stillMissing = [];
+foreach ($missingKeys as $key) {
+    if (!isset($translations[$key])) {
+        $stillMissing[] = $key;
+    }
+}
+
+if (count($stillMissing) > 0) {
+    // Retry with simplified prompt
+    $retryTranslations = $agent->runTranslation($stillMissing, retry: true);
+    $translations = array_merge($translations, $retryTranslations);
+}
+```
+</CodeGroup>
+
+<Note>
+  The `runTranslation()` method uses a custom JSON schema that enforces translation of all requested keys. This ensures the AI cannot skip or omit translations.
+</Note>
+
+## Custom Chunk Size
+
+The `chunkSize` parameter allows you to control the trade-off between API efficiency and token usage:
+
+```php
+use Mateffy\AiTranslations\TranslationAgent;
+
+// Smaller chunks (fewer tokens per request, more API calls)
+$smallAgent = new TranslationAgent(
+    from: $source,
+    to: $target,
+    chunkSize: 15
+);
+
+// Larger chunks (more tokens per request, fewer API calls)
+$largeAgent = new TranslationAgent(
+    from: $source,
+    to: $target,
+    chunkSize: 50
+);
+```
+
+<Expandable title="Chunk Size Recommendations">
+  - **Small chunks (10-20)**: Better for rate-limited API keys or when translations are very long
+  - **Medium chunks (30-40)**: Balanced approach, good for most use cases
+  - **Large chunks (50+)**: Faster processing but higher token usage per request and increased risk of partial failures
+</Expandable>
+
+## Integration with Translator
+
+The `TranslationAgent` is typically used by the `Translator` class rather than directly:
+
+```php
+use Mateffy\AiTranslations\Translator;
+use Mateffy\AiTranslations\TranslationFile;
+
+$translator = new Translator();
+
+$from = TranslationFile::load('en', 'validation');
+$to = TranslationFile::load('es', 'validation');
+
+// Translator handles agent instantiation and retry logic
+$translations = $translator->translate(
+    from: $from,
+    to: $to,
+    missingKeys: $from->compare($to),
+    fast: true
+);
+```
+
+However, you can use `TranslationAgent` directly for more fine-grained control:
+
+```php
+use Mateffy\AiTranslations\TranslationAgent;
+use Mateffy\AiTranslations\TranslationFile;
+
+$agent = new TranslationAgent(
+    from: TranslationFile::load('en', 'custom'),
+    to: TranslationFile::load('ja', 'custom'),
+    fast: false,
+    chunkSize: 25
+);
+
+$translations = $agent->runTranslation(
+    missing: ['custom.greeting', 'custom.farewell'],
+    retry: false,
+    progress: fn($i, $t) => print("Chunk {$i}/{$t}\n")
+);
+```
+
+## Provider-Specific Behavior
+
+Different AI providers may exhibit different characteristics:
+
+<Expandable title="OpenAI">
+  - Generally fast and reliable
+  - GPT-4o recommended for quality, GPT-4o-mini for speed
+  - Good at maintaining context and consistency
+</Expandable>
+
+<Expandable title="Anthropic">
+  - Excellent instruction following
+  - Claude 3.5 Sonnet for quality, Claude 3.5 Haiku for speed
+  - Strong performance with complex translation requirements
+</Expandable>
+
+<Expandable title="Gemini">
+  - Cost-effective option
+  - Fast processing times
+  - Gemini 2.0 Flash for balanced speed and quality
+</Expandable>
+
+## Related Classes
+
+- [Translator](/api/classes/translator) - High-level orchestrator that uses TranslationAgent
+- [TranslationFile](/api/classes/translation-file) - Manages translation file data
+- [TranslationsDTO](/api/classes/translations-dto) - Data transfer object for AI responses

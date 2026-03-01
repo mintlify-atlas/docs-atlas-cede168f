@@ -1,0 +1,559 @@
+---
+title: 'Context Awareness'
+description: 'How the LLM maintains translation consistency through full file context'
+---
+
+## Overview
+
+Context awareness is a key differentiator of AI Translations for Laravel. Unlike simple key-by-key translation tools, this package provides the LLM with complete context about your entire translation file, enabling consistent terminology, appropriate tone, and contextual accuracy.
+
+## Why Context Matters
+
+Consider translating the English word "Cancel" to German:
+
+<CodeGroup>
+
+```php Without Context
+// Simple translation: just the word
+'button.cancel' => 'Abbrechen'
+
+// But what if your app uses different terms?
+'dialog.cancel' => 'Abbrechen'  // Inconsistent with...
+'form.cancel' => 'Verwerfen'     // ...existing usage
+```
+
+```php With Context
+// LLM sees existing translations:
+'button.save' => 'Speichern'
+'button.delete' => 'Löschen'
+'button.close' => 'Schließen'
+
+// And chooses consistent style:
+'button.cancel' => 'Abbrechen'   // Matches infinitive verb pattern
+'dialog.cancel' => 'Abbrechen'   // Maintains consistency
+'form.cancel' => 'Abbrechen'     // Same terminology throughout
+```
+
+</CodeGroup>
+
+<Info>
+Context awareness ensures your translations feel cohesive, as if written by a single translator familiar with your entire application.
+</Info>
+
+## Full File Context Strategy
+
+The package sends both complete source and target files to the LLM, even when translating just a few missing keys.
+
+### Implementation
+
+```php
+// TranslationAgent.php:143-156
+$message = ($retry || $index > 0) 
+    ? new UserMessage($prompt)  // Subsequent chunks: minimal prompt
+    : new UserMessage(<<<PROMPT  // First chunk: full context
+    <{$this->from->language}-file>
+    {$this->from->toJson()}
+    </{$this->from->language}-file>
+
+    <{$this->to->language}-file>
+    {$this->to->toJson()}
+    </{$this->to->language}-file>
+
+    {$prompt}
+    PROMPT);
+```
+
+### What the LLM Receives
+
+<Tabs>
+  <Tab title="Source File (from)">
+    The complete source language file in JSON format:
+    
+    ```json
+    {
+      "auth.failed": "These credentials do not match our records.",
+      "auth.password": "The provided password is incorrect.",
+      "auth.throttle": "Too many login attempts. Please try again in {seconds} seconds.",
+      "validation.required": "The {attribute} field is required.",
+      "validation.email": "The {attribute} must be a valid email address.",
+      "validation.max.string": "The {attribute} must not be greater than {max} characters."
+      // ... all other keys
+    }
+    ```
+    
+    **Purpose:** Shows the LLM what needs to be translated and provides context about the application domain.
+  </Tab>
+  
+  <Tab title="Target File (to)">
+    The existing target language file in JSON format:
+    
+    ```json
+    {
+      "auth.failed": "Diese Zugangsdaten sind nicht korrekt.",
+      "auth.password": "Das angegebene Passwort ist falsch.",
+      "validation.required": "Das Feld {attribute} ist erforderlich.",
+      "validation.email": "Das Feld {attribute} muss eine gültige E-Mail-Adresse sein."
+      // ... existing translations (may be incomplete)
+    }
+    ```
+    
+    **Purpose:** Provides translation style, terminology choices, and tone that should be maintained.
+  </Tab>
+  
+  <Tab title="Missing Keys">
+    The specific keys that need translation:
+    
+    ```
+    auth.throttle
+    validation.max.string
+    ```
+    
+    **Purpose:** Tells the LLM exactly which keys to translate in this chunk.
+  </Tab>
+  
+  <Tab title="System Instructions">
+    Detailed instructions about the translation task:
+    
+    ```
+    You are a real estate software translator.
+    You translate Laravel language files from en to de.
+    
+    Try to reuse the old translations or adapt your new 
+    translations with the existing ones as context. 
+    We don't want to change existing UI around too much.
+    ```
+    
+    **Purpose:** Guides the LLM's translation approach and emphasizes consistency.
+  </Tab>
+</Tabs>
+
+## How Context Maintains Consistency
+
+The LLM uses the full file context to make informed decisions across multiple dimensions:
+
+### 1. Terminology Consistency
+
+The LLM learns your application's specific vocabulary:
+
+<AccordionGroup>
+  <Accordion title="Technical Terms">
+    **Scenario:** Your app uses "Workspace" instead of "Project"
+    
+    ```json
+    // Source (en)
+    {
+      "workspace.create": "Create Workspace",
+      "workspace.delete": "Delete Workspace",
+      "workspace.settings": "Workspace Settings"
+      // New key to translate:
+      "workspace.invite": "Invite to Workspace"
+    }
+    ```
+    
+    **Without context:** Might translate as "Einladen zum Projekt" (Project)
+    
+    **With context:** Translates as "Zum Arbeitsbereich einladen" (Workspace)
+    
+    The LLM sees you consistently use "Workspace" and maintains that terminology.
+  </Accordion>
+  
+  <Accordion title="Domain-Specific Language">
+    **Scenario:** Real estate application with specific terms
+    
+    ```json
+    // Existing translations show domain
+    {
+      "property.list": "Immobilien auflisten",
+      "property.details": "Immobiliendetails",
+      "agent.profile": "Maklerprofil"
+      // New translation maintains domain:
+      "property.featured": "Hervorgehobene Immobilien"
+    }
+    ```
+    
+    The LLM understands it's a real estate context and uses appropriate terminology like "Immobilien" (properties) and "Makler" (agent) rather than generic alternatives.
+  </Accordion>
+  
+  <Accordion title="Brand-Specific Terms">
+    **Scenario:** Your brand uses specific capitalization or terminology
+    
+    ```json
+    {
+      "feature.smartMatch": "SmartMatch enabled",
+      "feature.smartMatchDesc": "SmartMatch finds..."
+      // New key preserves brand term:
+      "feature.smartMatchSettings": "SmartMatch Settings"
+    }
+    ```
+    
+    The LLM recognizes "SmartMatch" is a proper noun and doesn't translate it, maintaining brand consistency.
+  </Accordion>
+</AccordionGroup>
+
+### 2. Tone and Formality
+
+Translations maintain consistent formality levels:
+
+```json
+// Formal tone (German "Sie" form)
+{
+  "welcome.greeting": "Willkommen! Bitte melden Sie sich an.",
+  "profile.update": "Aktualisieren Sie Ihr Profil"
+  // New translation matches formality:
+  "account.verify": "Verifizieren Sie Ihr Konto"  // Uses "Sie"
+}
+
+// vs. Informal tone (German "du" form)
+{
+  "welcome.greeting": "Willkommen! Bitte melde dich an.",
+  "profile.update": "Aktualisiere dein Profil"
+  // New translation matches informality:
+  "account.verify": "Verifiziere dein Konto"  // Uses "du"
+}
+```
+
+<Note>
+The system instructions explicitly tell the LLM to "try to reuse the old translations or adapt your new translations with the existing ones as context" (TranslationAgent.php:60-61).
+</Note>
+
+### 3. Placeholder Handling
+
+The LLM learns how your translations handle Laravel's placeholders:
+
+```json
+// Existing pattern:
+{
+  "validation.required": "The {attribute} field is required.",
+  "validation.min.string": "The {attribute} must be at least {min} characters."
+}
+
+// LLM maintains pattern in German:
+{
+  "validation.required": "Das Feld {attribute} ist erforderlich.",
+  "validation.min.string": "Das Feld {attribute} muss mindestens {min} Zeichen lang sein.",
+  // New translation follows same pattern:
+  "validation.max.string": "Das Feld {attribute} darf maximal {max} Zeichen lang sein."
+}
+```
+
+**Key observations:**
+- Placeholders like `{attribute}`, `{min}`, `{max}` are never translated
+- Sentence structure adapts to target language while preserving placeholders
+- Consistent phrasing ("Das Feld {attribute}...") across validation messages
+
+### 4. Punctuation and Formatting
+
+Style choices like punctuation are maintained:
+
+<CodeGroup>
+
+```json With Periods
+// Source file uses periods:
+{
+  "success.saved": "Changes saved successfully.",
+  "success.deleted": "Item deleted successfully."
+}
+
+// Target maintains periods:
+{
+  "success.saved": "Änderungen erfolgreich gespeichert.",
+  "success.deleted": "Element erfolgreich gelöscht.",
+  "success.updated": "Erfolgreich aktualisiert."  // New: also has period
+}
+```
+
+```json Without Periods
+// Source file omits periods:
+{
+  "success.saved": "Changes saved successfully",
+  "success.deleted": "Item deleted successfully"
+}
+
+// Target matches style:
+{
+  "success.saved": "Änderungen erfolgreich gespeichert",
+  "success.deleted": "Element erfolgreich gelöscht",
+  "success.updated": "Erfolgreich aktualisiert"  // New: no period
+}
+```
+
+</CodeGroup>
+
+## Context Preservation Across Chunks
+
+When translating large files, context is maintained throughout the chunking process:
+
+```php
+// TranslationAgent.php:143-156
+$message = ($retry || $index > 0) 
+    ? new UserMessage($prompt)
+    : new UserMessage(<<<PROMPT
+    <{$this->from->language}-file>
+    {$this->from->toJson()}
+    </{$this->from->language}-file>
+
+    <{$this->to->language}-file>
+    {$this->to->toJson()}
+    </{$this->to->language}-file>
+
+    {$prompt}
+    PROMPT);
+```
+
+<Steps>
+  <Step title="First Chunk">
+    Receives complete source and target files, establishing full context.
+  </Step>
+  
+  <Step title="Subsequent Chunks">
+    Continue the conversation without resending files. The LLM's context window retains the full file contents from the first message.
+  </Step>
+  
+  <Step title="Consistency Maintained">
+    Even though later chunks don't explicitly include the files, the LLM remembers the context and maintains consistency.
+  </Step>
+</Steps>
+
+<Tip>
+This approach optimizes token usage while preserving context quality. The full files are sent once, not repeatedly for each chunk.
+</Tip>
+
+## Context-Aware Instructions
+
+The system prompt provides explicit guidance on using context:
+
+```php
+// TranslationAgent.php:50-72 (simplified)
+You are given the contents of the original {$from->language} file, 
+and contents of the {$to->language} file if it exists already and 
+is outdated.
+
+If a file is passed, try to reuse the old translations or to adapt 
+your new translations with the existing ones as context. We don't 
+want to change existing UI around too much.
+```
+
+**Key directives:**
+
+<CardGroup cols={2}>
+  <Card title="Reuse Translations" icon="recycle">
+    Leverage existing translations to understand terminology preferences and style.
+  </Card>
+  
+  <Card title="Adapt New Content" icon="puzzle-piece">
+    Make new translations feel like they belong to the existing set.
+  </Card>
+  
+  <Card title="Minimize UI Changes" icon="lock">
+    Consistency prevents user confusion from varying translation styles.
+  </Card>
+  
+  <Card title="Complete Context" icon="book-open">
+    Full source and target files provide comprehensive understanding.
+  </Card>
+</CardGroup>
+
+## Real-World Context Benefits
+
+Here's how context awareness improves real translations:
+
+### Example 1: Validation Messages
+
+<Tabs>
+  <Tab title="Without Context">
+    **Problem:** Inconsistent phrasing across validation messages
+    
+    ```json
+    {
+      "required": "Dieses Feld ist erforderlich",
+      "email": "E-Mail muss gültig sein",
+      "min": "Mindestens {min} Zeichen",
+      "max": "{max} Zeichen Maximum"  // Inconsistent style!
+    }
+    ```
+    
+    Each key translated independently results in varying sentence structures.
+  </Tab>
+  
+  <Tab title="With Context">
+    **Solution:** Consistent phrasing pattern maintained
+    
+    ```json
+    {
+      "required": "Das Feld {attribute} ist erforderlich",
+      "email": "Das Feld {attribute} muss eine gültige E-Mail sein",
+      "min": "Das Feld {attribute} muss mindestens {min} Zeichen haben",
+      "max": "Das Feld {attribute} darf maximal {max} Zeichen haben"
+    }
+    ```
+    
+    The LLM recognizes the pattern "Das Feld {attribute}..." and maintains it.
+  </Tab>
+</Tabs>
+
+### Example 2: Button Labels
+
+<Tabs>
+  <Tab title="Without Context">
+    **Problem:** Mixed verb forms and styles
+    
+    ```json
+    {
+      "save": "Speichern",        // Infinitive
+      "delete": "Gelöscht",       // Past participle  
+      "cancel": "Abbruch",        // Noun
+      "submit": "Senden"          // Infinitive
+    }
+    ```
+  </Tab>
+  
+  <Tab title="With Context">
+    **Solution:** Consistent infinitive form
+    
+    ```json
+    {
+      "save": "Speichern",
+      "delete": "Löschen",
+      "cancel": "Abbrechen",
+      "submit": "Senden"
+    }
+    ```
+    
+    All buttons use infinitive verb form, matching UI convention.
+  </Tab>
+</Tabs>
+
+### Example 3: Error Messages
+
+<Tabs>
+  <Tab title="Without Context">
+    **Problem:** Inconsistent tone (formal vs informal)
+    
+    ```json
+    {
+      "unauthorized": "Sie sind nicht berechtigt",     // Formal (Sie)
+      "forbidden": "Du darfst das nicht",              // Informal (du)
+      "not_found": "Die Seite wurde nicht gefunden"   // Neutral
+    }
+    ```
+  </Tab>
+  
+  <Tab title="With Context">
+    **Solution:** Uniform formality level
+    
+    ```json
+    {
+      "unauthorized": "Sie sind nicht berechtigt",
+      "forbidden": "Sie haben keine Zugriffsberechtigung",
+      "not_found": "Die Seite wurde nicht gefunden"
+    }
+    ```
+    
+    Consistent formal address ("Sie") throughout the application.
+  </Tab>
+</Tabs>
+
+## Optimizing for Context Quality
+
+### Keep Source Language High Quality
+
+Your source language directly affects translation quality:
+
+<CardGroup cols={2}>
+  <Card title="Clear" icon="lightbulb">
+    **Good:** "The password field is required"
+    
+    **Bad:** "pwd req"
+    
+    Clear source text produces clear translations.
+  </Card>
+  
+  <Card title="Consistent" icon="equals">
+    **Good:** Always use "Workspace" (not "Project" sometimes)
+    
+    Consistency in source ensures consistency in translations.
+  </Card>
+  
+  <Card title="Complete" icon="circle-check">
+    **Good:** Full sentences with proper grammar
+    
+    **Bad:** Fragments or abbreviations
+    
+    Complete source helps LLM understand context.
+  </Card>
+  
+  <Card title="Contextual" icon="message-dots">
+    **Good:** "validation.required": "The {attribute} field is required"
+    
+    **Bad:** "required": "Required"
+    
+    Descriptive keys and complete sentences provide better context.
+  </Card>
+</CardGroup>
+
+### Group Related Translations
+
+Organize your language files logically:
+
+```php
+// Good: Related translations in same file
+lang/en/auth.php        // All authentication messages
+lang/en/validation.php  // All validation messages  
+lang/en/admin.php       // All admin interface text
+
+// The LLM gets better context when related translations are together
+```
+
+<Info>
+When the LLM translates `validation.php`, all validation messages are in context, enabling it to maintain consistent phrasing patterns across all validation errors.
+</Info>
+
+## Limitations and Considerations
+
+<AccordionGroup>
+  <Accordion title="Context Window Limits">
+    Very large translation files (1000+ keys) may exceed LLM context windows.
+    
+    **Solution:** The chunking strategy keeps each request manageable, and conversation context maintains consistency across chunks.
+  </Accordion>
+  
+  <Accordion title="First Translation Quality">
+    When translating to a completely new language, there's no existing target file to provide translation style context.
+    
+    **Solution:** Use the standard (non-fast) model for first translations to new languages. The source file context is still valuable.
+  </Accordion>
+  
+  <Accordion title="Conflicting Existing Translations">
+    If your existing translations are inconsistent, the LLM might perpetuate those inconsistencies.
+    
+    **Solution:** Clean up your source and primary target language files before translating to additional languages.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Maintain Quality Source Files">
+    Keep your primary language (usually English) complete, clear, and consistent. It's the foundation for all translations.
+  </Step>
+  
+  <Step title="Translate Incrementally">
+    When adding features, translate to your primary target languages first, then use those as reference for additional languages.
+  </Step>
+  
+  <Step title="Review First Translation">
+    For the first translation to a new language, carefully review output to establish quality baseline.
+  </Step>
+  
+  <Step title="Use Standard Models for New Languages">
+    Don't use `--fast` when translating to a completely new language - context quality matters most.
+  </Step>
+  
+  <Step title="Group Related Content">
+    Organize translations logically (auth, validation, admin, etc.) so related content shares context.
+  </Step>
+</Steps>
+
+<Tip>
+Context awareness is most effective when your source language files are well-organized and consistently written. Invest time in your primary language, and translations to all other languages will benefit.
+</Tip>

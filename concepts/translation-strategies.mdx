@@ -1,0 +1,504 @@
+---
+title: 'Translation Strategies'
+description: 'Learn about partial vs full translation, chunking strategies, and retry logic'
+---
+
+## Translation Modes
+
+AI Translations for Laravel supports two primary translation strategies that are automatically selected based on your files' state.
+
+### Partial Translation (Selective Update)
+
+Partial translation updates only the missing or outdated keys in an existing translation file, leaving all other translations untouched.
+
+**When it's used:**
+- Target language file already exists
+- You've added new keys to the source language
+- You want to preserve existing translations
+
+**Workflow:**
+
+<Steps>
+  <Step title="Detect Missing Keys">
+    The system compares source and target files to identify missing translations:
+    
+    ```php
+    // TranslationFile.php:84-90
+    public function compare(TranslationFile $file): array
+    {
+        $flatKeys = static::flatten($this->translations);
+        $flatFileKeys = static::flatten($file->translations);
+        
+        // Returns only keys present in source but missing in target
+        return array_diff($flatKeys, $flatFileKeys);
+    }
+    ```
+  </Step>
+  
+  <Step title="Translate Only Missing">
+    Only the identified missing keys are sent to the LLM for translation, along with full context of both files.
+  </Step>
+  
+  <Step title="Merge Into Existing">
+    New translations are merged into the existing file structure without modifying unchanged keys.
+  </Step>
+</Steps>
+
+**Example scenario:**
+
+```php
+// Source: lang/en/validation.php
+return [
+    'required' => 'This field is required',
+    'email' => 'Must be a valid email',
+    'uuid' => 'Must be a valid UUID',  // NEW KEY
+];
+
+// Target: lang/de/validation.php (before)
+return [
+    'required' => 'Dieses Feld ist erforderlich',
+    'email' => 'Muss eine gültige E-Mail sein',
+    // 'uuid' is missing
+];
+
+// After partial translation
+return [
+    'required' => 'Dieses Feld ist erforderlich',  // UNCHANGED
+    'email' => 'Muss eine gültige E-Mail sein',     // UNCHANGED
+    'uuid' => 'Muss eine gültige UUID sein',        // ADDED
+];
+```
+
+<Tip>
+Partial translation is the default and most efficient strategy. It preserves your translation history and only uses AI tokens for new content.
+</Tip>
+
+### Full Translation
+
+Full translation creates a complete translation file from scratch, translating every key in the source language.
+
+**When it's used:**
+- Target language file doesn't exist
+- Translating to a completely new language
+- Target file is empty or missing
+
+**How it works:**
+
+```php
+// Translator.php:40-46
+public function translate(
+    TranslationFile $from,
+    TranslationFile $to,
+    array $missingKeys,  // When target is empty, ALL keys are "missing"
+    bool $fast = false,
+    ?Closure $progress = null,
+): array
+```
+
+When the target file is empty, `array_diff()` returns all source keys as "missing," triggering a complete translation.
+
+**Command usage:**
+
+```bash
+# Translate to a new language (full translation)
+php artisan translate --language=ja
+
+# Translate specific file to new language
+php artisan translate --name=validation --language=ja
+```
+
+<Note>
+Full translation processes the entire source file in chunks, which may take several minutes for large translation files (500+ keys).
+</Note>
+
+## Chunking Strategy
+
+To handle large translation files efficiently and stay within LLM token limits, the package uses an intelligent chunking strategy.
+
+### Chunk Size Configuration
+
+The default chunk size is **35 keys per chunk**, defined in the `TranslationAgent` class:
+
+```php
+// TranslationAgent.php:21
+public readonly int $chunkSize = 35
+```
+
+**Why 35 keys?**
+- Balances token usage with translation quality
+- Prevents context window overflow
+- Allows LLM to maintain focus on each subset
+- Provides reasonable progress increments
+
+### Chunking Implementation
+
+```php
+// TranslationAgent.php:97-99
+$missing_chunks = collect($missing)
+    ->values()
+    ->chunk($this->chunkSize);
+```
+
+Missing keys are split into chunks using Laravel's Collection `chunk()` method:
+
+<CodeGroup>
+
+```php Example: 100 Missing Keys
+// Input: 100 missing translation keys
+$missingKeys = [
+    'validation.required',
+    'validation.email',
+    // ... 98 more keys
+];
+
+// After chunking (chunkSize = 35)
+Chunk 1: 35 keys (validation.required ... validation.min)
+Chunk 2: 35 keys (validation.max ... auth.throttle)
+Chunk 3: 30 keys (auth.failed ... passwords.reset)
+
+// Result: 3 separate LLM requests
+```
+
+```php Example: 20 Missing Keys
+// Input: 20 missing translation keys
+$missingKeys = [
+    'auth.failed',
+    'auth.password',
+    // ... 18 more keys
+];
+
+// After chunking (chunkSize = 35)
+Chunk 1: 20 keys (all of them)
+
+// Result: 1 LLM request
+```
+
+</CodeGroup>
+
+### Context Management Across Chunks
+
+An optimization is applied to avoid sending the full context repeatedly:
+
+```php
+// TranslationAgent.php:143-156
+$message = ($retry || $index > 0) 
+    ? new UserMessage($prompt)  // Minimal prompt for subsequent chunks
+    : new UserMessage(<<<PROMPT  // Full context for first chunk only
+    <{$this->from->language}-file>
+    {$this->from->toJson()}
+    </{$this->from->language}-file>
+
+    <{$this->to->language}-file>
+    {$this->to->toJson()}
+    </{$this->to->language}-file>
+
+    {$prompt}
+    PROMPT);
+```
+
+<AccordionGroup>
+  <Accordion title="First Chunk">
+    **Includes:**
+    - Complete source language file (as JSON)
+    - Complete target language file (as JSON)
+    - List of missing keys for this chunk
+    - Translation task instructions
+    
+    This provides full context for the LLM to understand terminology and style.
+  </Accordion>
+  
+  <Accordion title="Subsequent Chunks">
+    **Includes:**
+    - List of missing keys for this chunk
+    - Translation task instructions
+    
+    **Excludes:**
+    - Full file contents (already in conversation context)
+    
+    The LLM maintains context from the conversation history, so full files don't need to be resent.
+  </Accordion>
+</AccordionGroup>
+
+<Info>
+This approach significantly reduces token usage for large translation jobs while maintaining consistent quality across all chunks.
+</Info>
+
+### Progress Tracking
+
+Chunking enables granular progress reporting:
+
+```php
+// Translator.php:56-64
+$chunkCount = $currentlyMissingKeys->chunk($agent->chunkSize)->count();
+
+if ($progress) {
+    $progress(0, $chunkCount, $counter);
+}
+
+$translations = $agent->runTranslation(
+    $currentlyMissingKeys->all(), 
+    retry: $counter > 0,
+    progress: fn (int $index, int $total) => $progress($index, $chunkCount, $counter)
+);
+```
+
+The CLI displays real-time progress:
+
+```bash
+Translating from en to de: validation
+[████████████░░░░░░░░] 2/3 chunks (Attempt 1)
+```
+
+## Retry Logic
+
+The package implements robust retry logic to handle LLM inconsistencies and ensure all keys are translated successfully.
+
+### Retry Mechanism
+
+```php
+// Translator.php:47-86
+$allTranslations = collect();
+$currentlyMissingKeys = collect($missingKeys);
+$counter = 0;
+
+while ($counter < 3 && $currentlyMissingKeys->isNotEmpty()) {
+    // Run translation
+    $translations = $agent->runTranslation(
+        $currentlyMissingKeys->all(), 
+        retry: $counter > 0,
+        progress: fn (int $index, int $total) => $progress($index, $chunkCount, $counter)
+    );
+    
+    // Merge results
+    $allTranslations = $allTranslations->merge($translations);
+    
+    // Check what's still missing
+    $currentlyMissingKeys = collect($missingKeys)
+        ->filter(fn(string $key) => empty($allTranslations[$key] ?? null))
+        ->values();
+    
+    $counter++;
+}
+```
+
+### Retry Flow
+
+<Steps>
+  <Step title="Attempt 1 (counter = 0)">
+    Process all missing keys in chunks with full context.
+  </Step>
+  
+  <Step title="Verification">
+    Check if any requested keys are still missing from the results.
+  </Step>
+  
+  <Step title="Attempt 2 (counter = 1)">
+    If keys are missing, retry with `retry: true` flag. Only the still-missing keys are processed.
+  </Step>
+  
+  <Step title="Attempt 3 (counter = 2)">
+    Final retry attempt if keys remain missing.
+  </Step>
+  
+  <Step title="Failure Handling">
+    After 3 attempts, if keys are still missing, throw an exception:
+    
+    ```php
+    // Translator.php:88-93
+    if ($currentlyMissingKeys->isNotEmpty()) {
+        throw new Exception(
+            "Missing translation keys: " .
+                $currentlyMissingKeys->join(", ")
+        );
+    }
+    ```
+  </Step>
+</Steps>
+
+### Common Retry Scenarios
+
+<CardGroup cols={2}>
+  <Card title="Nested Array Response" icon="layer-group">
+    **Problem:** LLM returns nested arrays instead of flat dot notation
+    
+    **Solution:** Auto-flatten and retry
+    
+    ```php
+    // Translator.php:67-75
+    $hasNestedTranslations = collect($translations)
+        ->some(fn($value) => is_array($value));
+
+    if ($hasNestedTranslations) {
+        $translations = TranslationFile::flattenWithValues(
+            $translations
+        );
+    }
+    ```
+  </Card>
+  
+  <Card title="Incomplete Response" icon="list-check">
+    **Problem:** LLM skips some keys in the chunk
+    
+    **Solution:** Automatic retry with only missing keys
+    
+    The verification step identifies missing keys and retries just those specific translations.
+  </Card>
+  
+  <Card title="Malformed JSON" icon="code">
+    **Problem:** LLM returns invalid JSON structure
+    
+    **Solution:** JSON schema validation fails, triggering retry
+    
+    Structured output ensures valid JSON or automatic retry.
+  </Card>
+  
+  <Card title="Network Timeout" icon="wifi-slash">
+    **Problem:** API request times out or fails
+    
+    **Solution:** Exception is thrown, but can be retried manually
+    
+    Use `--interactive` mode to handle failures gracefully.
+  </Card>
+</CardGroup>
+
+### Retry Optimization
+
+The retry system is optimized to minimize wasted effort:
+
+1. **Incremental retry:** Only missing keys are retried, not the entire chunk
+2. **Context preservation:** Conversation history is maintained across retries
+3. **Max 3 attempts:** Prevents infinite loops from persistent LLM issues
+4. **Merged results:** Successfully translated keys from attempt 1 are preserved
+
+<Tip>
+If you frequently hit retry limits, consider reducing chunk size or switching to a more capable LLM model (disable `--fast` flag).
+</Tip>
+
+## Model Selection Strategy
+
+The package supports two model tiers for different use cases:
+
+### Standard Models (Default)
+
+```php
+// config/ai-translations.php
+'openai' => [
+    'model' => 'gpt-4o',  // High quality
+],
+'anthropic' => [
+    'model' => 'claude-3-5-sonnet-20241022',  // High quality
+],
+```
+
+**Best for:**
+- Production translations
+- Customer-facing content
+- Complex or nuanced language
+- First-time translations to new languages
+
+### Fast Models
+
+```php
+// config/ai-translations.php  
+'openai' => [
+    'fast_model' => 'gpt-3.5-turbo',  // Lower cost, faster
+],
+'anthropic' => [
+    'fast_model' => 'claude-3-haiku-20240307',  // Lower cost, faster
+],
+```
+
+**Best for:**
+- Development and testing
+- Updating a few missing keys
+- Non-critical translations
+- Quick iterations
+
+**Usage:**
+
+```bash
+# Use fast model
+php artisan translate --fast
+
+# Use standard model (default)
+php artisan translate
+```
+
+<Info>
+Fast models are typically 5-10x cheaper and 2-3x faster, but may produce slightly lower quality translations, especially for idiomatic expressions.
+</Info>
+
+## Strategy Selection Guide
+
+<AccordionGroup>
+  <Accordion title="Adding a new language">
+    **Strategy:** Full translation with standard model
+    
+    ```bash
+    php artisan translate --language=ja
+    ```
+    
+    **Why:** Creates complete, high-quality translations for all keys.
+  </Accordion>
+  
+  <Accordion title="Updating existing translations">
+    **Strategy:** Partial translation with fast model
+    
+    ```bash
+    php artisan translate --fast
+    ```
+    
+    **Why:** Quickly updates only new keys, preserving existing translations.
+  </Accordion>
+  
+  <Accordion title="Large translation file (500+ keys)">
+    **Strategy:** Full translation with standard model, monitor progress
+    
+    ```bash
+    php artisan translate --language=fr --name=admin
+    ```
+    
+    **Why:** Chunking handles large files efficiently while maintaining quality.
+  </Accordion>
+  
+  <Accordion title="Development/testing">
+    **Strategy:** Partial translation with fast model
+    
+    ```bash
+    php artisan translate --fast --language=de
+    ```
+    
+    **Why:** Rapid iterations without significant cost.
+  </Accordion>
+  
+  <Accordion title="Production deployment">
+    **Strategy:** Validate first, then partial translation with standard model
+    
+    ```bash
+    php artisan translate:validate
+    php artisan translate
+    ```
+    
+    **Why:** Ensures quality and only translates what's necessary.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Regular Validation" icon="check-double">
+    Run `translate:validate` before deploying to catch missing translations early.
+  </Card>
+  
+  <Card title="Incremental Updates" icon="arrows-rotate">
+    Translate frequently as you add features rather than accumulating hundreds of missing keys.
+  </Card>
+  
+  <Card title="Source Language Consistency" icon="language">
+    Keep your source language (usually `en`) complete and well-written - it directly affects translation quality.
+  </Card>
+  
+  <Card title="Interactive Mode" icon="comments">
+    Use `--interactive` for critical translations to review and retry individual files.
+  </Card>
+</CardGroup>

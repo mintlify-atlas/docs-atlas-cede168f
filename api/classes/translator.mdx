@@ -1,0 +1,239 @@
+---
+title: Translator
+description: Main orchestrator class for AI-powered translations in Laravel applications
+---
+
+## Overview
+
+The `Translator` class is the main orchestrator for AI-powered translations. It manages the translation workflow, coordinates with the `TranslationAgent`, handles retry logic, and provides language detection capabilities.
+
+**Namespace**: `Mateffy\AiTranslations`
+
+## Class Definition
+
+```php
+namespace Mateffy\AiTranslations;
+
+use Closure;
+use Exception;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
+use NeuronAI\Chat\Messages\UserMessage;
+use NeuronAI\StructuredOutput\JsonExtractor;
+use NeuronAI\StructuredOutput\JsonSchema;
+
+class Translator
+{
+    // ...
+}
+```
+
+## Methods
+
+### getLanguages()
+
+Retrieves available languages from the language directory or configuration.
+
+```php
+public function getLanguages(string $langDir): Collection
+```
+
+<ParamField path="langDir" type="string" required>
+  The path to the language directory (typically `lang_path()`)
+</ParamField>
+
+<ResponseField name="Collection" type="Illuminate\Support\Collection">
+  A collection of language codes (e.g., `['en', 'es', 'fr']`)
+</ResponseField>
+
+#### Behavior
+
+- First checks the `ai-translations.languages` config value
+- If not configured, scans the language directory for subdirectories
+- Filters out `vendor` and `lang` directories
+- Returns language codes as a collection
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\Translator;
+
+$translator = new Translator();
+$languages = $translator->getLanguages(lang_path());
+
+// Collection of language codes: ['en', 'es', 'fr', 'de']
+foreach ($languages as $language) {
+    echo "Language: {$language}\n";
+}
+```
+
+---
+
+### translate()
+
+Translates missing keys from a source language file to a target language file using AI.
+
+```php
+public function translate(
+    TranslationFile $from,
+    TranslationFile $to,
+    array $missingKeys,
+    bool $fast = false,
+    ?Closure $progress = null,
+): array
+```
+
+<ParamField path="from" type="TranslationFile" required>
+  The source translation file containing the original translations
+</ParamField>
+
+<ParamField path="to" type="TranslationFile" required>
+  The target translation file where translations will be added
+</ParamField>
+
+<ParamField path="missingKeys" type="array" required>
+  An array of dot-notated keys that need translation (e.g., `['validation.email', 'auth.failed']`)
+</ParamField>
+
+<ParamField path="fast" type="bool" default="false">
+  Whether to use the fast model configuration for quicker (but potentially less accurate) translations
+</ParamField>
+
+<ParamField path="progress" type="?Closure" default="null">
+  Optional progress callback with signature: `function(int $completed, int $total, int $attempt): void`
+  
+  - `$completed`: Number of chunks completed
+  - `$total`: Total number of chunks to process
+  - `$attempt`: Current attempt number (0-2)
+</ParamField>
+
+<ResponseField name="array" type="array<string, string>">
+  An associative array of translated keys and values in dot notation format
+</ResponseField>
+
+#### Behavior
+
+- Processes translations in chunks using `TranslationAgent`
+- Automatically retries up to 3 times for missing translations
+- Handles nested array responses by flattening them
+- Validates that all requested keys are translated
+- Throws an exception if translations are still missing after 3 attempts
+
+#### Example
+
+<CodeGroup>
+```php Basic Usage
+use Mateffy\AiTranslations\Translator;
+use Mateffy\AiTranslations\TranslationFile;
+
+$translator = new Translator();
+
+$from = TranslationFile::load('en', 'validation');
+$to = TranslationFile::load('es', 'validation');
+
+$missingKeys = $from->compare($to);
+
+$translations = $translator->translate(
+    from: $from,
+    to: $to,
+    missingKeys: $missingKeys
+);
+
+// Apply and save translations
+$to->apply($translations);
+$to->write();
+```
+
+```php With Progress Tracking
+use Mateffy\AiTranslations\Translator;
+use Mateffy\AiTranslations\TranslationFile;
+
+$translator = new Translator();
+
+$from = TranslationFile::load('en', 'messages');
+$to = TranslationFile::load('fr', 'messages');
+
+$missingKeys = $from->compare($to);
+
+$translations = $translator->translate(
+    from: $from,
+    to: $to,
+    missingKeys: $missingKeys,
+    fast: true,
+    progress: function (int $completed, int $total, int $attempt) {
+        echo "Attempt {$attempt}: {$completed}/{$total} chunks completed\n";
+    }
+);
+
+$to->apply($translations)->write();
+```
+
+```php Error Handling
+use Mateffy\AiTranslations\Translator;
+use Mateffy\AiTranslations\TranslationFile;
+use Exception;
+
+$translator = new Translator();
+
+$from = TranslationFile::load('en', 'auth');
+$to = TranslationFile::load('de', 'auth');
+
+try {
+    $translations = $translator->translate(
+        from: $from,
+        to: $to,
+        missingKeys: ['auth.failed', 'auth.throttle']
+    );
+    
+    $to->apply($translations)->write();
+    echo "Translations completed successfully!\n";
+    
+} catch (Exception $e) {
+    echo "Translation failed: " . $e->getMessage();
+}
+```
+</CodeGroup>
+
+<Note>
+  The `translate()` method uses intelligent retry logic. If the AI doesn't return all required translations on the first attempt, it will automatically retry up to 3 times with refined prompts.
+</Note>
+
+## Usage Workflow
+
+Typical workflow for using the `Translator` class:
+
+```php
+use Mateffy\AiTranslations\Translator;
+use Mateffy\AiTranslations\TranslationFile;
+
+// 1. Initialize translator
+$translator = new Translator();
+
+// 2. Get available languages
+$languages = $translator->getLanguages(lang_path());
+
+// 3. Load source and target files
+$source = TranslationFile::load('en', 'validation');
+$target = TranslationFile::load('es', 'validation');
+
+// 4. Find missing keys
+$missingKeys = $source->compare($target);
+
+if (count($missingKeys) > 0) {
+    // 5. Translate missing keys
+    $translations = $translator->translate(
+        from: $source,
+        to: $target,
+        missingKeys: $missingKeys
+    );
+    
+    // 6. Apply and save
+    $target->apply($translations)->write();
+}
+```
+
+## Related Classes
+
+- [TranslationFile](/api/classes/translation-file) - Manages individual translation files
+- [TranslationAgent](/api/classes/translation-agent) - Handles AI provider communication

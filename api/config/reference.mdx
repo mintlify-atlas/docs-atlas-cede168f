@@ -1,0 +1,240 @@
+---
+title: Configuration
+description: Complete configuration reference for AI Translations for Laravel
+---
+
+## Overview
+
+The AI Translations package can be configured through the `config/ai-translations.php` file. After installing the package, publish the configuration file using:
+
+```bash
+php artisan vendor:publish --tag=ai-translations-config
+```
+
+## Configuration Options
+
+<ParamField path="languages" type="array | null" default="null">
+  The list of languages to support in your application.
+  
+  - When set to `null`, the package automatically reads existing languages from your `lang_path()` directory
+  - You can manually specify an array of language codes to explicitly define supported languages
+  
+  **Example:**
+  ```php
+  'languages' => ['en', 'es', 'fr', 'de']
+  ```
+</ParamField>
+
+<ParamField path="provider" type="string" default="gemini">
+  The AI provider to use for translations.
+  
+  **Supported values:**
+  - `"openai"` - Use OpenAI's GPT models
+  - `"gemini"` - Use Google's Gemini models
+  - `"anthropic"` - Use Anthropic's Claude models
+</ParamField>
+
+### OpenAI Configuration
+
+<ParamField path="openai.model" type="string" default="gpt-5-mini">
+  The default OpenAI model to use for translations.
+  
+  This model is used for standard translation operations.
+</ParamField>
+
+<ParamField path="openai.fast_model" type="string" default="gpt-5-nano">
+  The fast OpenAI model to use for quick translations.
+  
+  This model is optimized for speed and cost efficiency.
+</ParamField>
+
+<ParamField path="openai.api_key" type="string">
+  Your OpenAI API key.
+  
+  **Default:** Reads from `OPENAI_API_KEY` environment variable
+  
+  <Note>
+    Store your API key in your `.env` file, never commit it to version control.
+  </Note>
+</ParamField>
+
+### Gemini Configuration
+
+<ParamField path="gemini.model" type="string" default="gemini-flash-latest">
+  The default Gemini model to use for translations.
+  
+  This model is used for standard translation operations.
+</ParamField>
+
+<ParamField path="gemini.fast_model" type="string" default="gemini-flash-lite-latest">
+  The fast Gemini model to use for quick translations.
+  
+  This model is optimized for speed and cost efficiency.
+</ParamField>
+
+<ParamField path="gemini.api_key" type="string">
+  Your Google Gemini API key.
+  
+  **Default:** Reads from `GEMINI_API_KEY` environment variable
+  
+  <Note>
+    Store your API key in your `.env` file, never commit it to version control.
+  </Note>
+</ParamField>
+
+### Anthropic Configuration
+
+<ParamField path="anthropic.model" type="string" default="claude-sonnet-4-5">
+  The default Anthropic Claude model to use for translations.
+  
+  This model is used for standard translation operations.
+</ParamField>
+
+<ParamField path="anthropic.fast_model" type="string" default="claude-haiku-4-5">
+  The fast Anthropic Claude model to use for quick translations.
+  
+  This model is optimized for speed and cost efficiency.
+</ParamField>
+
+<ParamField path="anthropic.api_key" type="string">
+  Your Anthropic API key.
+  
+  **Default:** Reads from `ANTHROPIC_API_KEY` environment variable
+  
+  <Note>
+    Store your API key in your `.env` file, never commit it to version control.
+  </Note>
+</ParamField>
+
+## Example Configurations
+
+<Tabs>
+  <Tab title="Auto-detect Languages">
+    ```php
+    <?php
+
+    return [
+        // Automatically detect languages from lang_path()
+        'languages' => null,
+        
+        'provider' => 'gemini',
+        
+        'gemini' => [
+            'model' => 'gemini-flash-latest',
+            'fast_model' => 'gemini-flash-lite-latest',
+            'api_key' => env('GEMINI_API_KEY'),
+        ],
+    ];
+    ```
+  </Tab>
+  
+  <Tab title="Manual Languages">
+    ```php
+    <?php
+
+    return [
+        // Explicitly define supported languages
+        'languages' => [
+            'en',
+            'de',
+            'es',
+            'fr',
+            'it',
+            'nl',
+            'ua',
+            'ar',
+            'jp',
+            'cn',
+        ],
+        
+        'provider' => 'openai',
+        
+        'openai' => [
+            'model' => 'gpt-5-mini',
+            'fast_model' => 'gpt-5-nano',
+            'api_key' => env('OPENAI_API_KEY'),
+        ],
+    ];
+    ```
+  </Tab>
+  
+  <Tab title="Anthropic Provider">
+    ```php
+    <?php
+
+    return [
+        'languages' => null,
+        
+        'provider' => 'anthropic',
+        
+        'anthropic' => [
+            'model' => 'claude-sonnet-4-5',
+            'fast_model' => 'claude-haiku-4-5',
+            'api_key' => env('ANTHROPIC_API_KEY'),
+        ],
+    ];
+    ```
+  </Tab>
+</Tabs>
+
+## Environment Variables
+
+Add the appropriate API key to your `.env` file based on your chosen provider:
+
+<CodeGroup>
+```bash OpenAI
+OPENAI_API_KEY=sk-...
+```
+
+```bash Gemini
+GEMINI_API_KEY=...
+```
+
+```bash Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+```
+</CodeGroup>
+
+## Complete Configuration File
+
+```php
+<?php
+
+return [
+    // reads existing languages from the lang_path() directory
+    "languages" => null,
+
+    "provider" => "gemini",
+    "openai" => [
+        "model" => "gpt-5-mini",
+        "fast_model" => "gpt-5-nano",
+        "api_key" => env("OPENAI_API_KEY"),
+    ],
+
+    "gemini" => [
+        "model" => "gemini-flash-latest",
+        "fast_model" => "gemini-flash-lite-latest",
+        "api_key" => env("GEMINI_API_KEY"),
+    ],
+
+    "anthropic" => [
+        "model" => "claude-sonnet-4-5",
+        "fast_model" => "claude-haiku-4-5",
+        "api_key" => env("ANTHROPIC_API_KEY"),
+    ],
+
+    // Optionally, you can specify the languages manually:
+    //'languages' => [
+    //    'en',
+    //    'de',
+    //    'es',
+    //    'fr',
+    //    'it',
+    //    'nl',
+    //    'ua',
+    //    'ar',
+    //    'jp',
+    //    'cn',
+    //],
+];
+```

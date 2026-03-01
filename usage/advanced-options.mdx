@@ -1,0 +1,309 @@
+---
+title: Advanced Options
+description: Power user features and advanced command flags for fine-tuned control
+---
+
+The translate command offers several advanced options for power users who need precise control over the translation process.
+
+## Fast Mode
+
+Use a faster, more cost-effective LLM model with the `--fast` flag:
+
+```bash
+php artisan translate --fast
+```
+
+### When to Use Fast Mode
+
+<CardGroup cols={2}>
+  <Card title="Development" icon="code">
+    Quick translations during development and testing
+  </Card>
+  
+  <Card title="Large Projects" icon="database">
+    Translating many files to reduce costs and time
+  </Card>
+  
+  <Card title="Draft Translations" icon="file-lines">
+    Creating initial drafts for human review
+  </Card>
+  
+  <Card title="Simple Content" icon="text">
+    Translating straightforward, non-critical text
+  </Card>
+</CardGroup>
+
+<Warning>
+Fast mode uses a less precise model. Review the output carefully for important or customer-facing content.
+</Warning>
+
+### Fast Mode Trade-offs
+
+**Advantages:**
+- Faster translation speed
+- Lower API costs
+- Good for bulk operations
+
+**Disadvantages:**
+- Less contextual accuracy
+- May miss nuanced meanings
+- Not ideal for marketing or legal content
+
+### Combining Fast Mode with Interactive Mode
+
+```bash
+php artisan translate --fast --interactive
+```
+
+This combination lets you:
+- Generate quick initial translations
+- Review and refine results interactively
+- Iterate rapidly during development
+
+## Skip Options
+
+### Skip Specific Files
+
+Exclude certain language files from translation with `--skip-names`:
+
+```bash
+php artisan translate --skip-names=auth,passwords
+```
+
+Multiple files can be skipped by separating them with commas:
+
+```bash
+php artisan translate --skip-names=auth,passwords,validation
+```
+
+**Use cases:**
+- Skip files you've already manually translated
+- Exclude files with highly technical or specialized terminology
+- Avoid files that are managed by another team or process
+
+### Skip Specific Languages
+
+Exclude certain target languages with `--skip-languages`:
+
+```bash
+php artisan translate --skip-languages=cn,jp
+```
+
+Skip multiple languages:
+
+```bash
+php artisan translate --skip-languages=cn,jp,kr
+```
+
+**Use cases:**
+- Skip languages handled by professional translators
+- Exclude languages pending review
+- Avoid languages with special requirements
+
+<Note>
+The skip options are applied **after** the `--name` and `--language` options, giving you fine-grained control over what gets translated.
+</Note>
+
+## Custom Language Directory
+
+Specify a custom location for your translation files with `--lang-dir`:
+
+```bash
+php artisan translate --lang-dir=/custom/path/to/lang
+```
+
+### When to Use Custom Language Directory
+
+**Package Development:**
+```bash
+php artisan translate --lang-dir=/packages/my-package/lang
+```
+
+**Multi-tenant Applications:**
+```bash
+php artisan translate --lang-dir=/tenants/acme-corp/lang
+```
+
+**Testing:**
+```bash
+php artisan translate --lang-dir=/tests/fixtures/lang
+```
+
+<Tip>
+The `--lang-dir` option works with both the `translate` and `translate:validate` commands.
+</Tip>
+
+### Default Behavior
+
+Without the `--lang-dir` option, the package uses Laravel's standard `lang_path()`, which defaults to:
+- Laravel 9+: `lang/` directory in project root
+- Laravel 8 and below: `resources/lang/`
+
+## Advanced Flag Combinations
+
+### Selective Translation Workflow
+
+Translate specific files while skipping others:
+
+```bash
+php artisan translate \
+  --language=fr,es,de \
+  --skip-names=auth,passwords \
+  --fast
+```
+
+This translates:
+- To French, Spanish, and German
+- All files **except** auth and passwords
+- Using fast mode for speed
+
+### Package-Specific Translation
+
+Translate a package's language files:
+
+```bash
+php artisan translate \
+  --lang-dir=/packages/my-package/lang \
+  --name=validation \
+  --language=en,fr
+```
+
+### Production-Ready Workflow
+
+Translate critical files with quality control:
+
+```bash
+php artisan translate \
+  --name=marketing,legal,emails \
+  --skip-languages=cn \
+  --interactive
+```
+
+This workflow:
+- Focuses on critical domains
+- Skips Chinese (handled externally)
+- Uses interactive mode for quality control
+
+### Development Workflow
+
+Quick translations for development:
+
+```bash
+php artisan translate \
+  --fast \
+  --skip-names=passwords,auth
+```
+
+## Undocumented Internal Options
+
+The package includes some internal options that are generally not needed:
+
+### --after
+
+```bash
+php artisan translate --after=2024-01-01
+```
+
+<Warning>
+This is an internal option and not fully implemented. It's not recommended for production use.
+</Warning>
+
+## Command Reference
+
+### All Available Options
+
+Here's the complete list of options for the `translate` command:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `--name` | string | Translate specific files (comma-separated) |
+| `--language` | string | Translate to specific languages (comma-separated) |
+| `--base-language` | string | Source language (defaults to `app.locale`) |
+| `--fast` | flag | Use faster, less precise LLM |
+| `--interactive` | flag | Enable interactive re-translation prompts |
+| `--skip-names` | string | Skip specific files (comma-separated) |
+| `--skip-languages` | string | Skip specific languages (comma-separated) |
+| `--lang-dir` | string | Custom translation directory path |
+
+### Validation Command Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `--name` | string | Validate specific files (comma-separated) |
+| `--language` | string | Validate specific languages (comma-separated) |
+| `--base-language` | string | Source language for validation |
+| `--lang-dir` | string | Custom translation directory path |
+| `--verbose` / `-v` | flag | Show detailed output with missing key tables |
+
+## Best Practices
+
+<Steps>
+  <Step title="Start with validation">
+    ```bash
+    php artisan translate:validate --verbose
+    ```
+    Identify what needs translation
+  </Step>
+  
+  <Step title="Use fast mode for bulk work">
+    ```bash
+    php artisan translate --fast
+    ```
+    Generate initial translations quickly
+  </Step>
+  
+  <Step title="Refine critical content">
+    ```bash
+    php artisan translate --name=marketing,legal --interactive
+    ```
+    Use interactive mode without fast flag for quality
+  </Step>
+  
+  <Step title="Validate results">
+    ```bash
+    php artisan translate:validate
+    ```
+    Confirm all translations are complete
+  </Step>
+</Steps>
+
+## Performance Tips
+
+### Parallel Processing
+
+The package processes translations sequentially, so:
+
+- Translate different language sets in separate terminal sessions
+- Use `--language` to split work across multiple commands
+- Consider background jobs for large translation tasks
+
+### Cost Optimization
+
+```bash
+# Use fast mode for development
+php artisan translate --fast --skip-languages=cn,jp
+
+# Use standard mode for production
+php artisan translate --name=marketing --interactive
+```
+
+### Time Optimization
+
+<Tip>
+Use skip options to avoid re-translating files that haven't changed:
+```bash
+php artisan translate --skip-names=auth,passwords,validation
+```
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Basic Translation" icon="language" href="/usage/translating">
+    Return to basic translation guide
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Configure LLM providers and settings
+  </Card>
+</CardGroup>

@@ -1,0 +1,217 @@
+---
+title: Validating Translations
+description: Check for missing translations and ensure quality across all languages
+---
+
+The `translate:validate` command helps you maintain quality and completeness of your translations by checking for missing keys across all language files.
+
+## Basic Usage
+
+Run the validation command to check all language files:
+
+```bash
+php artisan translate:validate
+```
+
+This will scan all configured languages and domains, comparing them against your source language to identify any missing translations.
+
+## Example Output
+
+Here's what you'll see when running the validation command:
+
+```bash
+AI Translator: Validation
+Model: anthropic/claude-3-haiku-20240307
+Source: de
+Languages: cn, en, es, fr, it, pl
+Domains: test
+
+Checking test in es...
+
+No missing translations for test in es
+
+Checking test in fr...
+
+****************************************************
+*     Missing translations for `test` in `fr`:     *
+****************************************************
+
++---------------+-------------+
+| Key           | Value       |
++---------------+-------------+
+| something_new | Etwas neues |
+| testing       | Testen      |
++---------------+-------------+
+...
+```
+
+## Validation Output Modes
+
+### Standard Mode (Default)
+
+By default, validation shows a summary table of all domains:
+
+```bash
+php artisan translate:validate
+```
+
+The output displays:
+- ✔ (green checkmark) for complete translations
+- Number in red for the count of missing keys
+- "–" in red for completely missing files
+
+### Verbose Mode
+
+Use the `--verbose` or `-v` flag for detailed output with missing key tables:
+
+```bash
+php artisan translate:validate --verbose
+```
+
+This shows:
+- Each domain being checked
+- Each language being validated
+- Detailed tables of missing keys with their source values
+- Success messages for complete translations
+
+<Tip>
+Use verbose mode when you need to see exactly which keys are missing and their source values. This is helpful when planning translation work.
+</Tip>
+
+## Validate Specific Files
+
+Check only specific language files using the `--name` option:
+
+```bash
+php artisan translate:validate --name=validation
+```
+
+Validate multiple files:
+
+```bash
+php artisan translate:validate --name=validation,auth,passwords
+```
+
+## Validate Specific Languages
+
+Check specific target languages only:
+
+```bash
+php artisan translate:validate --language=fr
+```
+
+Validate multiple languages:
+
+```bash
+php artisan translate:validate --language=fr,es,de
+```
+
+## Change Source Language
+
+By default, validation uses your application's locale as the source language. Override this with `--base-language`:
+
+```bash
+php artisan translate:validate --base-language=en
+```
+
+## Custom Language Directory
+
+If your translations are in a non-standard location, use the `--lang-dir` option:
+
+```bash
+php artisan translate:validate --lang-dir=/path/to/lang
+```
+
+<Note>
+This is useful for packages or applications with custom translation file locations.
+</Note>
+
+## Combining Options
+
+Combine options for targeted validation:
+
+```bash
+php artisan translate:validate --name=auth --language=fr,es --verbose
+```
+
+This command will:
+- Only validate the `auth` language file
+- Only check French and Spanish translations
+- Show detailed output with missing key tables
+
+## Workflow Integration
+
+### Pre-Deployment Checks
+
+Add validation to your CI/CD pipeline to ensure translation completeness:
+
+```yaml
+# GitHub Actions example
+- name: Validate translations
+  run: php artisan translate:validate
+```
+
+### Regular Maintenance
+
+Run validation regularly to catch missing translations early:
+
+<Steps>
+  <Step title="Run validation">
+    ```bash
+    php artisan translate:validate --verbose
+    ```
+  </Step>
+  
+  <Step title="Review missing keys">
+    Check the output tables for missing translations
+  </Step>
+  
+  <Step title="Generate translations">
+    ```bash
+    php artisan translate
+    ```
+  </Step>
+  
+  <Step title="Verify completeness">
+    ```bash
+    php artisan translate:validate
+    ```
+  </Step>
+</Steps>
+
+## Understanding the Output
+
+### Complete Translations
+
+When a language file is fully translated, you'll see:
+
+```bash
+No missing translations for auth in fr
+```
+
+### Missing Translations
+
+When keys are missing, the output shows:
+- The domain and language affected
+- A table with the missing key names
+- The source language values for reference
+
+<Warning>
+Long key names and values are automatically truncated in the table output. Use the full key names when translating.
+</Warning>
+
+### Missing Files
+
+If an entire language file doesn't exist, it will be marked with "–" in the summary table.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Translate Files" icon="language" href="/usage/translating">
+    Generate missing translations with AI
+  </Card>
+  
+  <Card title="Interactive Mode" icon="comments" href="/usage/interactive-mode">
+    Refine translations interactively
+  </Card>
+</CardGroup>

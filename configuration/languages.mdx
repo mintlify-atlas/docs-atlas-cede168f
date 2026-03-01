@@ -1,0 +1,328 @@
+---
+title: Languages
+description: Configure which languages your application supports
+---
+
+The AI Translations package can automatically detect available languages from your Laravel application or you can manually specify which languages to support.
+
+## Auto-detection (recommended)
+
+By default, the package automatically detects languages from your `lang` directory:
+
+```php config/ai-translations.php
+'languages' => null,
+```
+
+When set to `null`, the package scans your Laravel application's `lang_path()` directory and identifies all available language directories.
+
+### How auto-detection works
+
+The package looks for language subdirectories in your `lang` folder:
+
+```
+lang/
+├── en/
+│   ├── auth.php
+│   └── validation.php
+├── de/
+│   ├── auth.php
+│   └── validation.php
+├── fr/
+│   ├── auth.php
+│   └── validation.php
+└── es/
+    ├── auth.php
+    └── validation.php
+```
+
+In this example, the package would automatically detect: `en`, `de`, `fr`, and `es`.
+
+<Note>
+  Auto-detection is the recommended approach as it keeps your configuration in sync with your actual language files.
+</Note>
+
+## Manual configuration
+
+You can explicitly specify which languages your application supports:
+
+```php config/ai-translations.php
+'languages' => [
+    'en',
+    'de',
+    'es',
+    'fr',
+    'it',
+    'nl',
+    'ua',
+    'ar',
+    'jp',
+    'cn',
+],
+```
+
+### When to use manual configuration
+
+Manual configuration is useful when:
+
+- You want to translate to languages that don't exist yet in your `lang` directory
+- You want to exclude certain language directories from translation
+- You need strict control over which languages are processed
+- You're planning to add new languages and want them configured ahead of time
+
+## Language codes
+
+Use standard ISO 639-1 language codes (2-letter codes) or locale codes:
+
+<CodeGroup>
+```php Common language codes
+'languages' => [
+    'en', // English
+    'de', // German
+    'es', // Spanish
+    'fr', // French
+    'it', // Italian
+    'pt', // Portuguese
+    'nl', // Dutch
+    'pl', // Polish
+    'ru', // Russian
+    'ja', // Japanese
+    'zh', // Chinese
+    'ko', // Korean
+    'ar', // Arabic
+],
+```
+
+```php Regional variants
+'languages' => [
+    'en',    // English (generic)
+    'en_US', // US English
+    'en_GB', // British English
+    'pt',    // Portuguese (generic)
+    'pt_BR', // Brazilian Portuguese
+    'pt_PT', // European Portuguese
+    'zh_CN', // Simplified Chinese
+    'zh_TW', // Traditional Chinese
+],
+```
+</CodeGroup>
+
+<Warning>
+  Ensure the language codes you use match the directory names in your `lang` folder, otherwise translations won't be saved correctly.
+</Warning>
+
+## Base language
+
+The **base language** (also called source language) is the language you're translating **from**. By default, this is your application's locale:
+
+```php config/app.php
+'locale' => 'en',
+```
+
+You can override the base language when running translation commands:
+
+```bash
+php artisan translate --base-language=de
+```
+
+This is useful when:
+- Your primary language isn't English
+- You want to translate from a different source language
+- You're maintaining translations in multiple directions
+
+<Note>
+  The base language should always be complete and accurate, as all other translations are generated from it.
+</Note>
+
+## Working with language files
+
+### Creating a new language
+
+To add a new language to your application:
+
+1. **Manual configuration**: Add the language code to the `languages` array
+2. **Auto-detection**: Create a new directory in your `lang` folder
+
+<Tabs>
+  <Tab title="Auto-detection">
+    ```bash
+    mkdir lang/de
+    ```
+
+    Then run the translate command:
+
+    ```bash
+    php artisan translate --language=de
+    ```
+
+    The package will create translation files automatically.
+  </Tab>
+
+  <Tab title="Manual configuration">
+    Add the language to your config:
+
+    ```php config/ai-translations.php
+    'languages' => [
+        'en',
+        'de', // New language
+        'fr',
+    ],
+    ```
+
+    Create the directory:
+
+    ```bash
+    mkdir lang/de
+    ```
+
+    Run the translate command:
+
+    ```bash
+    php artisan translate --language=de
+    ```
+  </Tab>
+</Tabs>
+
+### Translating specific languages
+
+You can limit translations to specific languages:
+
+```bash
+# Translate only to German
+php artisan translate --language=de
+
+# Skip certain languages
+php artisan translate --skip-languages=de,fr
+```
+
+### Validating languages
+
+Check for missing translations in specific languages:
+
+```bash
+# Validate all languages
+php artisan translate:validate
+
+# Validate specific language
+php artisan translate:validate --language=de
+
+# Validate with different base language
+php artisan translate:validate --base-language=en
+```
+
+## Best practices
+
+### Keep your base language complete
+
+Always ensure your base language (typically `en`) is complete and up-to-date:
+
+```bash
+php artisan translate:validate --language=en
+```
+
+All other translations are generated from this source, so it must be accurate.
+
+### Use auto-detection when possible
+
+Auto-detection keeps your configuration simple and automatically adapts to your project structure:
+
+```php
+'languages' => null, // Recommended
+```
+
+### Group related translations
+
+Organize your language files by domain:
+
+```
+lang/en/
+├── auth.php
+├── validation.php
+├── messages.php
+├── emails.php
+└── admin.php
+```
+
+This makes it easier to translate specific sections:
+
+```bash
+php artisan translate --name=auth
+```
+
+### Validate before deploying
+
+Always run validation before deploying to ensure all translations are complete:
+
+```bash
+php artisan translate:validate
+```
+
+## Examples
+
+### Multi-language application
+
+```php config/ai-translations.php
+return [
+    'languages' => null, // Auto-detect from lang directory
+    'provider' => 'anthropic',
+    'anthropic' => [
+        'model' => 'claude-sonnet-4-5',
+        'fast_model' => 'claude-haiku-4-5',
+        'api_key' => env('ANTHROPIC_API_KEY'),
+    ],
+];
+```
+
+```bash
+# Translate all detected languages
+php artisan translate
+
+# Translate only specific language
+php artisan translate --language=de
+
+# Validate all languages
+php artisan translate:validate
+```
+
+### European languages only
+
+```php config/ai-translations.php
+'languages' => [
+    'en', // English
+    'de', // German
+    'fr', // French
+    'es', // Spanish
+    'it', // Italian
+    'pt', // Portuguese
+    'nl', // Dutch
+    'pl', // Polish
+],
+```
+
+### Adding Asian languages
+
+```php config/ai-translations.php
+'languages' => [
+    'en',    // English
+    'ja',    // Japanese
+    'ko',    // Korean
+    'zh_CN', // Simplified Chinese
+    'zh_TW', // Traditional Chinese
+    'th',    // Thai
+    'vi',    // Vietnamese
+],
+```
+
+<Note>
+  LLM models generally handle Asian languages well, but always review translations for cultural appropriateness and context.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Start translating" icon="language" href="/usage/translating">
+    Learn how to translate your language files
+  </Card>
+  <Card title="Validate translations" icon="check" href="/usage/validation">
+    Check for missing translations
+  </Card>
+</CardGroup>

@@ -1,0 +1,104 @@
+---
+title: Configuration overview
+description: Learn how to configure AI Translations for Laravel
+---
+
+## Publishing the configuration file
+
+The AI Translations package includes a configuration file that allows you to customize various aspects of the translation behavior. To publish the configuration file to your Laravel application, run:
+
+```bash
+php artisan vendor:publish --tag=ai-translations-config
+```
+
+This will create a `config/ai-translations.php` file in your application where you can customize the package settings.
+
+## Configuration file structure
+
+The configuration file is organized into the following sections:
+
+<CardGroup cols={2}>
+  <Card title="LLM provider" icon="robot" href="/configuration/llm-providers">
+    Configure which AI provider to use (OpenAI, Anthropic, or Gemini)
+  </Card>
+  <Card title="Languages" icon="language" href="/configuration/languages">
+    Define which languages your application supports
+  </Card>
+</CardGroup>
+
+## Default configuration
+
+Here's the complete default configuration file:
+
+```php config/ai-translations.php
+<?php
+
+return [
+    // reads existing languages from the lang_path() directory
+    "languages" => null,
+
+    "provider" => "gemini",
+    "openai" => [
+        "model" => "gpt-5-mini",
+        "fast_model" => "gpt-5-nano",
+        "api_key" => env("OPENAI_API_KEY"),
+    ],
+
+    "gemini" => [
+        "model" => "gemini-flash-latest",
+        "fast_model" => "gemini-flash-lite-latest",
+        "api_key" => env("GEMINI_API_KEY"),
+    ],
+
+    "anthropic" => [
+        "model" => "claude-sonnet-4-5",
+        "fast_model" => "claude-haiku-4-5",
+        "api_key" => env("ANTHROPIC_API_KEY"),
+    ],
+];
+```
+
+## Configuration options
+
+<ParamField path="languages" type="array|null" default="null">
+  An array of language codes your application supports. When set to `null`, the package automatically detects languages from your `lang` directory.
+</ParamField>
+
+<ParamField path="provider" type="string" default="gemini">
+  The LLM provider to use for translations. Available options: `openai`, `anthropic`, or `gemini`.
+</ParamField>
+
+<ParamField path="openai" type="array">
+  Configuration options for the OpenAI provider.
+  
+  - `model` (string): The primary model to use for translations
+  - `fast_model` (string): A faster, less expensive model used with the `--fast` flag
+  - `api_key` (string): Your OpenAI API key
+</ParamField>
+
+<ParamField path="anthropic" type="array">
+  Configuration options for the Anthropic provider.
+  
+  - `model` (string): The primary model to use for translations
+  - `fast_model` (string): A faster model used with the `--fast` flag
+  - `api_key` (string): Your Anthropic API key
+</ParamField>
+
+<ParamField path="gemini" type="array">
+  Configuration options for the Gemini provider.
+  
+  - `model` (string): The primary model to use for translations
+  - `fast_model` (string): A faster model used with the `--fast` flag
+  - `api_key` (string): Your Gemini API key
+</ParamField>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Configure LLM providers" icon="brain" href="/configuration/llm-providers">
+    Set up your AI provider credentials and models
+  </Card>
+  <Card title="Configure languages" icon="globe" href="/configuration/languages">
+    Define which languages to translate
+  </Card>
+</CardGroup>

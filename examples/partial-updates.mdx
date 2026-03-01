@@ -1,0 +1,226 @@
+---
+title: 'Partial Updates'
+description: 'Update only missing keys in existing translation files without regenerating everything'
+icon: 'arrow-rotate-right'
+---
+
+One of the most powerful features of AI Translations is the ability to update only missing translation keys without regenerating the entire file. This is perfect for maintaining existing translations while adding new ones.
+
+## How It Works
+
+The package intelligently:
+1. Compares your source language file with the target language file
+2. Identifies missing or new keys
+3. Translates only those missing keys
+4. Merges them into the existing translation file
+
+## Scenario: Adding New Keys
+
+Let's say you've added new features to your application and need to translate only the new keys.
+
+### Before: Your Source File
+
+Your English file `lang/en/messages.php` has been updated with new keys:
+
+```php lang/en/messages.php
+<?php
+
+return [
+    // Existing keys
+    'welcome' => 'Welcome to our application',
+    'goodbye' => 'Thank you for using our service',
+    
+    // NEW: Recently added keys
+    'dashboard' => [
+        'title' => 'Dashboard',
+        'stats' => 'Your Statistics',
+        'recent_activity' => 'Recent Activity',
+    ],
+    'settings' => [
+        'profile' => 'Profile Settings',
+        'privacy' => 'Privacy Controls',
+    ],
+];
+```
+
+### Before: Your Target File
+
+Your Spanish file `lang/es/messages.php` only has the old translations:
+
+```php lang/es/messages.php
+<?php
+
+return [
+    'welcome' => 'Bienvenido a nuestra aplicación',
+    'goodbye' => 'Gracias por usar nuestro servicio',
+    // Missing: dashboard.* and settings.* keys
+];
+```
+
+### Running the Partial Update
+
+Simply run the translate command - it automatically detects missing keys:
+
+```bash
+php artisan translate --name=messages --language=es
+```
+
+**Output:**
+
+```bash
+AI Translator
+Source: en
+Languages: es
+Domains: messages
+
+Translating from en to es: messages
+5 missing keys found: dashboard.title, dashboard.stats, dashboard.recent_activity, settings.profile, settings.privacy
+
+Translating in 1 chunks... (attempt #1 of 3)
+████████████████████ 100%
+
+Generated translations for messages from en to es:
+dashboard.title: "Panel de Control"
+dashboard.stats: "Tus Estadísticas"
+dashboard.recent_activity: "Actividad Reciente"
+settings.profile: "Configuración del Perfil"
+settings.privacy: "Controles de Privacidad"
+
+Writing translations for messages from en to es
+```
+
+### After: Your Updated Target File
+
+The Spanish file now contains both old and new translations:
+
+```php lang/es/messages.php
+<?php
+
+return [
+    // Existing translations (preserved)
+    'welcome' => 'Bienvenido a nuestra aplicación',
+    'goodbye' => 'Gracias por usar nuestro servicio',
+    
+    // Newly added translations
+    'dashboard' => [
+        'title' => 'Panel de Control',
+        'stats' => 'Tus Estadísticas',
+        'recent_activity' => 'Actividad Reciente',
+    ],
+    'settings' => [
+        'profile' => 'Configuración del Perfil',
+        'privacy' => 'Controles de Privacidad',
+    ],
+];
+```
+
+<Note>
+  **Key Point:** The existing translations (`welcome` and `goodbye`) were preserved exactly as they were. Only the missing keys were translated and added.
+</Note>
+
+## When No Missing Keys Exist
+
+If all keys are already translated, you'll see:
+
+```bash
+Translating from en to es: messages
+No missing keys found. Skipping...
+```
+
+This prevents unnecessary API calls and preserves your existing translations.
+
+## Interactive Mode: Force Re-translation
+
+If you want to re-translate even when no keys are missing (e.g., to improve existing translations), use `--interactive`:
+
+```bash
+php artisan translate --name=messages --language=es --interactive
+```
+
+You'll be prompted:
+
+```bash
+Translating from en to es: messages
+No missing keys found. Translate the full file again? (yes/no) [no]
+>
+```
+
+<CodeGroup>
+  ```bash Answer: yes
+  > yes
+  
+  Translating in 1 chunks... (attempt #1 of 3)
+  ████████████████████ 100%
+  
+  # All keys will be re-translated
+  ```
+
+  ```bash Answer: no
+  > no
+  
+  No missing keys found. Skipping...
+  ```
+</CodeGroup>
+
+## Validating Partial Updates
+
+After updating, validate that all keys are now present:
+
+```bash
+php artisan translate:validate --name=messages --language=es
+```
+
+**Output:**
+
+```bash
+Checking translations...
+Source: en
+Languages: es
+Domains: messages
+
++-------------+--------------+
+| Domain      | Missing Keys |
++-------------+--------------+
+| es/messages | ✔            |
++-------------+--------------+
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Regular validation checks">
+    Run `translate:validate` regularly in your CI/CD pipeline to catch missing translations early:
+    
+    ```bash
+    php artisan translate:validate
+    ```
+  </Accordion>
+
+  <Accordion title="Version control integration">
+    Commit your translation files to version control. When team members add new keys to the source language, others can run:
+    
+    ```bash
+    php artisan translate
+    ```
+    
+    This updates all languages with only the missing keys.
+  </Accordion>
+
+  <Accordion title="Preserve manual edits">
+    Since partial updates only add missing keys, any manual edits you've made to existing translations are preserved. This allows you to:
+    - Manually refine specific translations
+    - Keep custom terminology
+    - Maintain brand voice
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Basic Translation" icon="language" href="/examples/basic-translation">
+    Learn the basics of translating files
+  </Card>
+  <Card title="Multi-Language" icon="globe" href="/examples/multi-language">
+    Translate to multiple languages at once
+  </Card>
+</CardGroup>

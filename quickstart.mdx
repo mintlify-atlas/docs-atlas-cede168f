@@ -1,80 +1,256 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with AI Translations for Laravel in minutes
 ---
 
-## Get started in three steps
+This guide will walk you through translating your first language file using AI Translations for Laravel.
 
-Get your documentation site running locally and make your first customization.
+## Before you begin
 
-### Step 1: Set up your local environment
+Make sure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- Installed the package via Composer
+- Published the configuration file
+- Added your LLM provider API key to `.env`
 
-### Step 2: Deploy your changes
+If you haven't completed these steps, see the [installation guide](/installation).
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Step 1: Prepare your source language file
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+First, create a language file in your base language (typically `en`). For this example, we'll create a simple authentication messages file:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+```php lang/en/auth.php
+<?php
 
-### Step 3: Go live
+return [
+    'failed' => 'These credentials do not match our records.',
+    'password' => 'The provided password is incorrect.',
+    'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
+];
+```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Step 2: Configure your environment
+
+Add your LLM provider credentials to your `.env` file:
+
+<CodeGroup>
+
+```env Anthropic (Recommended)
+ANTHROPIC_API_KEY=sk-ant-api03-...
+```
+
+```env OpenAI
+OPENAI_API_KEY=sk-proj-...
+```
+
+```env Google Gemini
+GEMINI_API_KEY=AIza...
+```
+
+</CodeGroup>
+
+Set your provider in `config/ai-translations.php`:
+
+```php config/ai-translations.php
+return [
+    "provider" => "anthropic", // Change to your provider
+    // ... rest of config
+];
+```
+
+## Step 3: Run your first translation
+
+Now you're ready to translate your language files. Run the translate command:
+
+```bash
+php artisan translate
+```
+
+You'll see output similar to this:
+
+```bash
+AI Translator
+Source: en
+Languages: de, es, fr
+Domains: auth
+
+Translating from en to de: auth
+3 missing keys found: failed, password, throttle
+
+  ┌ Translating in 1 chunks... (attempt #1 of 3) ──────────────┐
+  │ ████████████████████████████████████████████████████  100% │
+  └──────────────────────────────────────────────────────────────┘
+
+Generated translations for auth from en to de:
+failed: "Diese Zugangsdaten stimmen nicht mit unseren Unterlagen überein."
+password: "Das angegebene Passwort ist falsch."
+throttle: "Zu viele Anmeldeversuche. Bitte versuchen Sie es in :seconds Sekunden erneut."
+
+Writing translations for auth from en to de
+```
+
+The package will:
+
+1. Detect all languages in your `lang` directory
+2. Find missing translations for each language
+3. Use AI to generate contextually appropriate translations
+4. Write the translations to your language files
+
+## Step 4: Check the generated translations
+
+The package creates new language files for each target language:
+
+```php lang/de/auth.php
+<?php
+
+return [
+    'failed' => 'Diese Zugangsdaten stimmen nicht mit unseren Unterlagen überein.',
+    'password' => 'Das angegebene Passwort ist falsch.',
+    'throttle' => 'Zu viele Anmeldeversuche. Bitte versuchen Sie es in :seconds Sekunden erneut.',
+];
+```
+
+<Note>
+  Notice how the AI preserves the `:seconds` placeholder in the translation. The LLM is context-aware and understands Laravel's translation placeholders.
+</Note>
+
+## Step 5: Validate your translations
+
+Verify that all translations are complete using the validation command:
+
+```bash
+php artisan translate:validate
+```
+
+You'll see a summary table:
+
+```bash
+Checking translations...
+Source: en
+Languages: de, es, fr
+Domains: auth
+
+  ┌────────────┬───────────────┐
+  │ Domain     │ Missing Keys  │
+  ├────────────┼───────────────┤
+  │ de/auth    │ ✔             │
+  │ es/auth    │ ✔             │
+  │ fr/auth    │ ✔             │
+  └────────────┴───────────────┘
+```
+
+<Note>
+  A green checkmark (✔) means no missing translations. Red numbers indicate how many keys are missing.
+</Note>
+
+## Common translation scenarios
+
+### Translate a specific file
+
+If you only want to translate a specific language file:
+
+```bash
+php artisan translate --name=auth
+```
+
+### Translate to a specific language
+
+To translate only to German:
+
+```bash
+php artisan translate --language=de
+```
+
+### Translate from a different base language
+
+If your source language is German instead of English:
+
+```bash
+php artisan translate --base-language=de
+```
+
+### Use faster (but less accurate) translations
+
+For quicker translations using a faster model:
+
+```bash
+php artisan translate --fast
+```
+
+### Interactive mode
+
+For more control, use interactive mode to review and re-translate files:
+
+```bash
+php artisan translate --interactive
+```
+
+In interactive mode, you'll be prompted to confirm translations for each file, allowing you to regenerate if needed.
+
+## Updating existing translations
+
+When you add new keys to your base language file, simply run the translate command again:
+
+```php lang/en/auth.php
+<?php
+
+return [
+    'failed' => 'These credentials do not match our records.',
+    'password' => 'The provided password is incorrect.',
+    'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
+    'locked' => 'Your account has been locked.', // New key
+];
+```
+
+```bash
+php artisan translate
+```
+
+The package will detect the missing `locked` key and translate only that key:
+
+```bash
+Translating from en to de: auth
+1 missing keys found: locked
+
+Generated translations for auth from en to de:
+locked: "Ihr Konto wurde gesperrt."
+```
+
+<Warning>
+  The package only translates missing keys by default. Existing translations are preserved to maintain consistency and avoid unnecessary API calls.
+</Warning>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that you've successfully translated your first language file, explore the full capabilities:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card
+    title="Translate command"
+    icon="language"
+    href="/api/commands/translate"
+  >
+    Learn about all translate command options and features
+  </Card>
+  <Card
+    title="Validate command"
+    icon="circle-check"
+    href="/api/commands/validate"
+  >
+    Master translation validation and quality checks
+  </Card>
+  <Card
+    title="Configuration"
+    icon="gear"
+    href="/configuration/overview"
+  >
+    Customize your translation workflow and provider settings
+  </Card>
+  <Card
+    title="Advanced options"
+    icon="sliders"
+    href="/usage/advanced-options"
+  >
+    Explore advanced command options and workflows
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

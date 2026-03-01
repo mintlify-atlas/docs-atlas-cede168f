@@ -1,0 +1,115 @@
+---
+title: AI Translations for Laravel
+description: Automatically translate your Laravel application's language files with high accuracy and context awareness using the power of LLMs
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.png"
+  alt="Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.png"
+  alt="Hero Dark"
+/>
+
+## Welcome to AI Translations for Laravel
+
+Automatically translate your Laravel application's language files with high accuracy and context awareness using the power of LLMs. Translate to completely new languages or keep your existing language files up-to-date, without completely re-generating the full file.
+
+This package also includes tools for validation of the files, maintaining quality and consistency across all your translations.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card
+    title="Automatic translation"
+    icon="language"
+  >
+    Automatically translate Laravel language files using AI-powered LLMs with context-aware translations
+  </Card>
+  <Card
+    title="Incremental updates"
+    icon="arrows-rotate"
+  >
+    Translate to new languages or update existing ones without full regeneration - only missing keys are translated
+  </Card>
+  <Card
+    title="Smart detection"
+    icon="magnifying-glass"
+  >
+    Intelligent detection of missing translations across all your language files
+  </Card>
+  <Card
+    title="Interactive mode"
+    icon="comments"
+  >
+    Interactive chat mode for translation refinement and quality control
+  </Card>
+  <Card
+    title="Validation tools"
+    icon="circle-check"
+  >
+    Built-in validation commands for quality assurance and consistency checking
+  </Card>
+  <Card
+    title="Multiple providers"
+    icon="brain"
+  >
+    Support for Anthropic Claude, OpenAI GPT, Google Gemini, and more via llm-magic
+  </Card>
+</CardGroup>
+
+## How it works
+
+The package reads Laravel's PHP language files into memory, preserving their nested array structure while allowing access through dot notation (e.g., `auth.failed` => `message`). It handles both reading existing translations and creating new language files.
+
+When translating, the system always provides the full source and target language files to the LLM to ensure it has complete context about the existing translations and their relationships. This helps maintain consistency in terminology and style across the application.
+
+The LLM then returns only the translated strings that need to be added or updated, using dot notation. This selective return is efficient as it allows precise updates without regenerating the entire translation file. These dot-notated translations are automatically merged into the existing translation structure, handling both new keys and updates to existing ones.
+
+## What you can do
+
+<CardGroup cols={2}>
+  <Card
+    title="Translate language files"
+    icon="language"
+    href="/api/commands/translate"
+  >
+    Generate translations for new languages or update existing translation files
+  </Card>
+  <Card
+    title="Validate translations"
+    icon="circle-check"
+    href="/api/commands/validate"
+  >
+    Check for missing translations and ensure consistency across language files
+  </Card>
+  <Card
+    title="Configure providers"
+    icon="gear"
+    href="/configuration/overview"
+  >
+    Set up your preferred LLM provider and customize translation behavior
+  </Card>
+  <Card
+    title="Interactive mode"
+    icon="terminal"
+    href="/usage/interactive-mode"
+  >
+    Use interactive mode to review and refine translations in real-time
+  </Card>
+</CardGroup>
+
+## Get started
+
+Ready to start translating your Laravel application? Follow our quickstart guide to get up and running in minutes.
+
+<Card
+  title="Quickstart guide"
+  icon="rocket"
+  href="/quickstart"
+>
+  Install the package, configure your LLM provider, and run your first translation
+</Card>

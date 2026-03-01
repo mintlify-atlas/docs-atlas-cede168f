@@ -1,0 +1,165 @@
+---
+title: 'Basic Translation'
+description: 'Step-by-step guide to translating your first Laravel language file'
+icon: 'language'
+---
+
+This guide walks you through translating your first Laravel language file using AI Translations.
+
+## Prerequisites
+
+Before starting, ensure you have:
+- Installed the package via Composer
+- Configured your LLM provider (Anthropic or OpenAI)
+- At least one existing language file in your Laravel project
+
+## Step-by-Step Translation
+
+<Steps>
+  <Step title="Check Your Source Language Files">
+    First, let's verify what translation files you have in your source language (e.g., English).
+
+    ```bash
+    ls lang/en/
+    ```
+
+    You should see files like:
+    ```
+    auth.php
+    validation.php
+    messages.php
+    ```
+  </Step>
+
+  <Step title="Review Your Source Translation File">
+    Let's look at an example source file `lang/en/messages.php`:
+
+    ```php lang/en/messages.php
+    <?php
+
+    return [
+        'welcome' => 'Welcome to our application',
+        'goodbye' => 'Thank you for using our service',
+        'notifications' => [
+            'new_message' => 'You have a new message',
+            'account_updated' => 'Your account has been updated',
+        ],
+        'errors' => [
+            'not_found' => 'The requested resource was not found',
+            'unauthorized' => 'You are not authorized to access this resource',
+        ],
+    ];
+    ```
+  </Step>
+
+  <Step title="Run Your First Translation">
+    Now let's translate the `messages.php` file to Spanish. Run:
+
+    ```bash
+    php artisan translate --name=messages --language=es
+    ```
+
+    You'll see output like this:
+
+    ```bash
+    AI Translator
+    Source: en
+    Languages: es
+    Domains: messages
+
+    Translating from en to es: messages
+    5 missing keys found: welcome, goodbye, notifications.new_message, notifications.account_updated, errors.not_found, errors.unauthorized
+    
+    Translating in 1 chunks... (attempt #1 of 3)
+    ████████████████████ 100%
+    
+    Generated translations for messages from en to es:
+    welcome: "Bienvenido a nuestra aplicación"
+    goodbye: "Gracias por usar nuestro servicio"
+    notifications.new_message: "Tienes un nuevo mensaje"
+    notifications.account_updated: "Tu cuenta ha sido actualizada"
+    errors.not_found: "El recurso solicitado no fue encontrado"
+    errors.unauthorized: "No estás autorizado para acceder a este recurso"
+
+    Writing translations for messages from en to es
+    ```
+  </Step>
+
+  <Step title="Verify the Generated File">
+    Check the newly created Spanish translation file:
+
+    ```bash
+    cat lang/es/messages.php
+    ```
+
+    The generated file will look like:
+
+    ```php lang/es/messages.php
+    <?php
+
+    return [
+        'welcome' => 'Bienvenido a nuestra aplicación',
+        'goodbye' => 'Gracias por usar nuestro servicio',
+        'notifications' => [
+            'new_message' => 'Tienes un nuevo mensaje',
+            'account_updated' => 'Tu cuenta ha sido actualizada',
+        ],
+        'errors' => [
+            'not_found' => 'El recurso solicitado no fue encontrado',
+            'unauthorized' => 'No estás autorizado para acceder a este recurso',
+        ],
+    ];
+    ```
+  </Step>
+
+  <Step title="Validate Your Translations">
+    Finally, validate that all keys have been translated:
+
+    ```bash
+    php artisan translate:validate --name=messages --language=es
+    ```
+
+    You should see:
+
+    ```bash
+    Checking translations...
+    Source: en
+    Languages: es
+    Domains: messages
+
+    +-------------+--------------+
+    | Domain      | Missing Keys |
+    +-------------+--------------+
+    | es/messages | ✔            |
+    +-------------+--------------+
+    ```
+  </Step>
+</Steps>
+
+## Using the Fast Mode
+
+For quicker translations with potentially less precision, use the `--fast` flag:
+
+```bash
+php artisan translate --name=messages --language=es --fast
+```
+
+This uses a faster LLM model, which is useful for:
+- Large translation files
+- Development/testing environments
+- Non-customer-facing content
+
+<Note>
+  The `--fast` flag trades some translation quality for speed. For production use, we recommend running without this flag to ensure the highest quality translations.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Partial Updates" icon="arrows-rotate" href="/examples/partial-updates">
+    Learn how to update only missing translation keys
+  </Card>
+  <Card title="Multi-Language" icon="globe" href="/examples/multi-language">
+    Translate to multiple languages at once
+  </Card>
+</CardGroup>

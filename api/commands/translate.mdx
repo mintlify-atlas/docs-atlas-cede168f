@@ -1,0 +1,137 @@
+---
+title: 'translate'
+description: 'Translate missing keys from your base language to target languages'
+---
+
+## Overview
+
+The `translate` command automatically translates missing translation keys from your base language to one or more target languages using AI.
+
+## Syntax
+
+```bash
+php artisan translate [options]
+```
+
+## Options
+
+<ParamField path="--fast" type="flag">
+  Use a faster LLM model for translations. This option sacrifices some precision for improved speed.
+</ParamField>
+
+<ParamField path="--interactive" type="flag">
+  Enable interactive mode. This allows you to review and re-translate each file individually, with the option to re-translate files even when no missing keys are found.
+</ParamField>
+
+<ParamField path="--skip-names" type="string">
+  Skip specific translation files. Provide a comma-separated list of file names to exclude from translation.
+  
+  Example: `--skip-names=validation,pagination`
+</ParamField>
+
+<ParamField path="--skip-languages" type="string">
+  Skip specific target languages. Provide a comma-separated list of language codes to exclude from translation.
+  
+  Example: `--skip-languages=fr,de`
+</ParamField>
+
+<ParamField path="--name" type="string">
+  Translate only specific file(s). Provide a comma-separated list of file names (without extension) to translate.
+  
+  Example: `--name=messages,validation`
+</ParamField>
+
+<ParamField path="--language" type="string">
+  Translate to specific language(s) only. Provide a comma-separated list of language codes.
+  
+  Example: `--language=es,fr,de`
+</ParamField>
+
+<ParamField path="--base-language" type="string">
+  The source language to translate from. Defaults to the `app.locale` configuration value.
+  
+  Example: `--base-language=en`
+</ParamField>
+
+<ParamField path="--after" type="string">
+  Internal option for resuming translations after a specific point.
+</ParamField>
+
+<ParamField path="--lang-dir" type="string">
+  Custom base path for translation files. Defaults to Laravel's `lang_path()` directory.
+  
+  Example: `--lang-dir=/custom/path/lang`
+</ParamField>
+
+## Examples
+
+<CodeGroup>
+
+```bash Basic Usage
+php artisan translate
+```
+
+```bash Translate Specific Languages
+php artisan translate --language=es,fr,de
+```
+
+```bash Translate Specific Files
+php artisan translate --name=messages,validation
+```
+
+```bash Fast Mode
+php artisan translate --fast
+```
+
+```bash Interactive Mode
+php artisan translate --interactive
+```
+
+```bash Skip Specific Files
+php artisan translate --skip-names=auth,pagination
+```
+
+```bash Complex Example
+php artisan translate --language=es,fr --name=messages --base-language=en --fast
+```
+
+</CodeGroup>
+
+## Output Example
+
+```bash
+AI Translator
+Source: en
+Languages: es, fr, de
+Domains: messages, validation
+
+Translating from en to es: messages
+15 missing keys found: welcome.title, welcome.subtitle, ...
+Translating in 3 chunks... (attempt #1 of 3) ████████████████████ 100%
+
+Generated translations for messages from en to es:
+welcome.title: "Bienvenido"
+welcome.subtitle: "Comience su viaje con nosotros"
+...
+
+Writing translations for messages from en to es
+
+Translating from en to fr: messages
+15 missing keys found: welcome.title, welcome.subtitle, ...
+```
+
+## Behavior
+
+- **Missing Keys Detection**: The command automatically detects which translation keys exist in your base language but are missing in target languages
+- **Chunked Processing**: Translations are processed in chunks with automatic retries (up to 3 attempts)
+- **Progress Tracking**: Real-time progress bars show translation progress for each file
+- **No Missing Keys**: When no missing keys are found, the file is skipped (unless in interactive mode)
+- **Automatic Writing**: Translated keys are automatically merged with existing translations and written to disk
+
+<Note>
+  The command preserves existing translations and only adds missing keys. It will never overwrite existing translation values unless you explicitly re-translate in interactive mode.
+</Note>
+
+## Related Commands
+
+- [translate:validate](/api/commands/validate) - Check for missing translation keys

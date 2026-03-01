@@ -1,0 +1,173 @@
+---
+title: 'translate:validate'
+description: 'Check for missing translations across all languages and domains'
+---
+
+## Overview
+
+The `translate:validate` command checks your translation files for missing keys by comparing target languages against your base language. It provides a comprehensive overview of translation coverage.
+
+## Syntax
+
+```bash
+php artisan translate:validate [options]
+```
+
+## Options
+
+<ParamField path="--name" type="string">
+  Validate only specific translation file(s). Provide a comma-separated list of file names (without extension).
+  
+  Example: `--name=messages,validation`
+</ParamField>
+
+<ParamField path="--language" type="string">
+  Validate specific language(s) only. Provide a comma-separated list of language codes.
+  
+  Example: `--language=es,fr,de`
+</ParamField>
+
+<ParamField path="--base-language" type="string">
+  The source language to compare against. Defaults to the `app.locale` configuration value.
+  
+  Example: `--base-language=en`
+</ParamField>
+
+<ParamField path="--lang-dir" type="string">
+  Custom base path for translation files. Defaults to Laravel's `lang_path()` directory.
+  
+  Example: `--lang-dir=/custom/path/lang`
+</ParamField>
+
+<ParamField path="-v, --verbose" type="flag">
+  Display detailed output including all missing keys with their values. Without this flag, only a summary table is shown.
+</ParamField>
+
+## Examples
+
+<CodeGroup>
+
+```bash Basic Usage
+php artisan translate:validate
+```
+
+```bash Validate Specific Languages
+php artisan translate:validate --language=es,fr
+```
+
+```bash Validate Specific Files
+php artisan translate:validate --name=messages,validation
+```
+
+```bash Verbose Output
+php artisan translate:validate --verbose
+```
+
+```bash Custom Base Language
+php artisan translate:validate --base-language=en
+```
+
+```bash Complex Example
+php artisan translate:validate --language=es,fr --name=messages --verbose
+```
+
+</CodeGroup>
+
+## Output Examples
+
+### Summary View (Default)
+
+```bash
+Checking translations...
+Source: en
+Languages: es, fr, de
+Domains: messages, validation
+
+┌─────────────────────┬──────────────┐
+│ Domain              │ Missing Keys │
+├─────────────────────┼──────────────┤
+│ de/messages         │ ✔            │
+│ de/validation       │ 3            │
+│ es/messages         │ ✔            │
+│ es/validation       │ –            │
+│ fr/messages         │ 5            │
+│ fr/validation       │ ✔            │
+└─────────────────────┴──────────────┘
+```
+
+### Verbose Output
+
+```bash
+Checking translations...
+Source: en
+Languages: es, fr
+Domains: messages
+
+Checking messages...
+
+Checking messages in es...
+
+✖ Missing translations for `messages` in `es`:
+┌──────────────────────────┬─────────────────────────────────────┐
+│ Key                      │ Value                               │
+├──────────────────────────┼─────────────────────────────────────┤
+│ welcome.title            │ Welcome to our application          │
+│ welcome.subtitle         │ Start your journey with us          │
+│ dashboard.greeting       │ Hello, :name!                       │
+└──────────────────────────┴─────────────────────────────────────┘
+
+Checking messages in fr...
+
+✔ No missing translations for messages in fr
+```
+
+## Understanding the Output
+
+### Status Indicators
+
+- **✔ (Green checkmark)**: All translations are present for this domain/language combination
+- **Number (Red)**: The count of missing translation keys
+- **– (Red dash)**: The translation file doesn't exist at all
+
+### Verbose Mode Details
+
+When using the `--verbose` flag, you'll see:
+
+- Individual progress for each domain and language
+- Tables showing each missing key alongside its value in the base language
+- Keys are limited to 100 characters for display
+- Values are limited to 70 characters for display
+
+<Note>
+  The validate command only checks for missing keys. It does not verify the quality or accuracy of existing translations.
+</Note>
+
+## Use Cases
+
+### CI/CD Integration
+
+Use this command in your continuous integration pipeline to ensure translations are complete:
+
+```bash
+php artisan translate:validate || exit 1
+```
+
+### Pre-Deployment Check
+
+Run validation before deploying to production to catch missing translations:
+
+```bash
+php artisan translate:validate --verbose
+```
+
+### Focused Validation
+
+Check specific files or languages when working on particular features:
+
+```bash
+php artisan translate:validate --name=messages --language=es,fr
+```
+
+## Related Commands
+
+- [translate](/api/commands/translate) - Automatically translate missing keys

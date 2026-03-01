@@ -1,0 +1,242 @@
+---
+title: Interactive Mode
+description: Refine and iterate on translations with interactive chat-based workflow
+---
+
+Interactive mode enables you to review, refine, and re-translate language files on the fly. This powerful feature uses a chat-based workflow to help you achieve the perfect translations.
+
+## Enabling Interactive Mode
+
+Add the `--interactive` flag to the translate command:
+
+```bash
+php artisan translate --interactive
+```
+
+This activates interactive prompts during the translation process.
+
+## How It Works
+
+<Steps>
+  <Step title="Initial translation">
+    The command translates missing keys as normal
+  </Step>
+  
+  <Step title="Review prompt">
+    For each language file, you're prompted to confirm or re-translate
+  </Step>
+  
+  <Step title="Refinement">
+    If you choose to re-translate, the AI generates new translations with the same context
+  </Step>
+  
+  <Step title="Iteration">
+    Repeat until you're satisfied with the results
+  </Step>
+</Steps>
+
+## When to Use Interactive Mode
+
+### Quality Control
+
+Use interactive mode when translation quality is critical:
+
+```bash
+php artisan translate --name=marketing --language=fr --interactive
+```
+
+This is ideal for:
+- Marketing copy and user-facing content
+- Legal or compliance text
+- Brand-specific terminology
+- Customer communications
+
+### Experimenting with Styles
+
+Try different translation approaches:
+
+```bash
+php artisan translate --name=emails --interactive
+```
+
+You can:
+- Compare formal vs. informal tones
+- Test different terminology choices
+- Refine nuanced translations
+
+### Translating Complete Files
+
+<Note>
+Interactive mode allows you to re-translate files even when no keys are missing.
+</Note>
+
+When a file has no missing keys, you'll be prompted:
+
+```
+No missing keys found. Translate the full file again?
+› Yes / No
+```
+
+Selecting "Yes" will:
+- Re-translate all keys in the file
+- Generate fresh translations with full context
+- Allow you to completely refresh outdated translations
+
+Without interactive mode, files with no missing keys are automatically skipped.
+
+## Interactive Workflow Example
+
+Here's what a typical interactive session looks like:
+
+```bash
+$ php artisan translate --name=auth --language=fr --interactive
+
+AI Translator
+Source: en
+Languages: fr
+Domains: auth
+
+Translating from en to fr: auth
+3 missing keys found: failed, throttle, password
+
+┌ Translating in 1 chunks... (attempt #1 of 3) ────────┐
+│ ████████████████████████████████████████ 100%       │
+└──────────────────────────────────────────────────────┘
+
+Generated translations for auth from en to fr:
+failed: "Ces identifiants ne correspondent pas à nos enregistrements."
+throttle: "Trop de tentatives de connexion. Veuillez réessayer dans :seconds secondes."
+password: "Les mots de passe doivent contenir au moins huit caractères et correspondre à la confirmation."
+
+◆ No missing keys found. Translate the full file again?
+│ ● Yes / ○ No
+└
+```
+
+## Combining with Other Options
+
+### Fast Mode + Interactive
+
+Use a faster model for quick iterations:
+
+```bash
+php artisan translate --fast --interactive
+```
+
+<Tip>
+This combination is great for rapid prototyping. Use fast mode to quickly generate translations, then review them interactively.
+</Tip>
+
+### Specific Files + Interactive
+
+Focus on particular domains:
+
+```bash
+php artisan translate --name=auth,passwords --interactive
+```
+
+### Multiple Languages + Interactive
+
+Review translations for several languages:
+
+```bash
+php artisan translate --language=fr,es,de --interactive
+```
+
+<Warning>
+Interactive mode will prompt for each language-domain combination. With many languages and domains, this can be time-consuming.
+</Warning>
+
+## Best Practices
+
+### Start with Non-Interactive
+
+For bulk translations:
+
+1. First run without interactive mode to generate all translations
+2. Then use interactive mode to refine specific files
+
+```bash
+# Step 1: Bulk translate
+php artisan translate
+
+# Step 2: Refine important files
+php artisan translate --name=marketing,legal --interactive
+```
+
+### Use with Validation
+
+Combine validation and interactive mode for a complete workflow:
+
+<Steps>
+  <Step title="Check for missing translations">
+    ```bash
+    php artisan translate:validate --verbose
+    ```
+  </Step>
+  
+  <Step title="Translate interactively">
+    ```bash
+    php artisan translate --interactive
+    ```
+  </Step>
+  
+  <Step title="Verify results">
+    ```bash
+    php artisan translate:validate
+    ```
+  </Step>
+</Steps>
+
+### Focus on Critical Content
+
+Prioritize interactive mode for:
+- User-facing error messages
+- Marketing and sales content  
+- Legal and compliance text
+- Email templates
+- In-app notifications
+
+Use non-interactive mode for:
+- Internal error messages
+- Development/debugging text
+- Admin panel content
+
+## Progress Indicators
+
+During translation, you'll see progress bars showing:
+
+```bash
+┌ Translating in 5 chunks... (attempt #1 of 3) ────────┐
+│ ████████████████░░░░░░░░░░░░░░░░░░░░░░░░ 40%       │
+└──────────────────────────────────────────────────────┘
+```
+
+- **Chunks**: Large files are split into chunks for processing
+- **Attempt**: The system makes up to 3 attempts if translation fails
+- **Progress**: Real-time progress of the current translation
+
+## Re-translation Behavior
+
+When you choose to re-translate in interactive mode:
+
+- The LLM receives the **same context** as before (full source and target files)
+- All keys are re-translated, not just missing ones
+- Previous translations are replaced entirely
+- The AI may produce different results due to its creative nature
+
+<Note>
+Each re-translation is independent. The AI doesn't remember your previous interactive session, so results may vary.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Options" icon="sliders" href="/usage/advanced-options">
+    Explore power user features and flags
+  </Card>
+  
+  <Card title="Validation" icon="check-circle" href="/usage/validation">
+    Verify translation completeness
+  </Card>
+</CardGroup>

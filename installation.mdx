@@ -1,0 +1,153 @@
+---
+title: Installation
+description: Learn how to install and configure AI Translations for Laravel
+---
+
+## Requirements
+
+Before installing AI Translations for Laravel, ensure your project meets these requirements:
+
+- PHP 8.1 or higher
+- Laravel 10.x or 11.x
+- An API key for your preferred LLM provider (Anthropic, OpenAI, or Google Gemini)
+
+## Install via Composer
+
+Install the package using Composer:
+
+```bash
+composer require mateffy/ai-translations
+```
+
+The package will automatically register its service provider through Laravel's package auto-discovery feature.
+
+## Publish configuration
+
+Publish the configuration file to customize the package settings:
+
+```bash
+php artisan vendor:publish --provider="Mateffy\AiTranslations\AiTranslationsServiceProvider"
+```
+
+This will create a `config/ai-translations.php` file in your Laravel application.
+
+## Configure your LLM provider
+
+The package supports multiple LLM providers through the `neuron-ai` library. You need to configure at least one provider to use the translation features.
+
+### Choose a provider
+
+The package supports the following providers:
+
+- **Anthropic** (Claude) - Recommended for best quality
+- **OpenAI** (GPT)
+- **Google Gemini**
+
+### Set your provider in config
+
+Open `config/ai-translations.php` and set your preferred provider:
+
+```php config/ai-translations.php
+return [
+    // Set your preferred provider
+    "provider" => "anthropic", // or "openai" or "gemini"
+
+    "anthropic" => [
+        "model" => "claude-sonnet-4-5",
+        "fast_model" => "claude-haiku-4-5",
+        "api_key" => env("ANTHROPIC_API_KEY"),
+    ],
+
+    "openai" => [
+        "model" => "gpt-5-mini",
+        "fast_model" => "gpt-5-nano",
+        "api_key" => env("OPENAI_API_KEY"),
+    ],
+
+    "gemini" => [
+        "model" => "gemini-flash-latest",
+        "fast_model" => "gemini-flash-lite-latest",
+        "api_key" => env("GEMINI_API_KEY"),
+    ],
+];
+```
+
+### Add API keys to your environment
+
+Add your API key to your `.env` file based on your chosen provider:
+
+<CodeGroup>
+
+```env Anthropic (Claude)
+ANTHROPIC_API_KEY=your-anthropic-api-key-here
+```
+
+```env OpenAI (GPT)
+OPENAI_API_KEY=your-openai-api-key-here
+```
+
+```env Google Gemini
+GEMINI_API_KEY=your-gemini-api-key-here
+```
+
+</CodeGroup>
+
+<Note>
+  The `fast_model` configuration is used when you run translation commands with the `--fast` flag for quicker (but potentially less accurate) translations.
+</Note>
+
+## Configure languages
+
+By default, the package automatically detects languages from your `lang` directory. You can also specify languages manually in the configuration file:
+
+```php config/ai-translations.php
+return [
+    // Automatically detect languages (default)
+    "languages" => null,
+
+    // Or specify languages manually:
+    // "languages" => [
+    //     'en',
+    //     'de',
+    //     'es',
+    //     'fr',
+    //     'it',
+    //     'nl',
+    //     'ua',
+    //     'ar',
+    //     'jp',
+    //     'cn',
+    // ],
+];
+```
+
+<Warning>
+  If you specify languages manually, only these languages will be processed during translation and validation.
+</Warning>
+
+## Verify installation
+
+Verify the package is installed correctly by running:
+
+```bash
+php artisan list translate
+```
+
+You should see the following commands:
+
+```bash
+translate            Translate your language files using AI
+translate:validate   Check for any missing translations
+```
+
+## Next steps
+
+Now that you've installed and configured the package, you're ready to start translating your language files.
+
+<Card
+  title="Quickstart guide"
+  icon="rocket"
+  href="/quickstart"
+>
+  Learn how to translate your first language file
+</Card>

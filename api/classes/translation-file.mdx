@@ -1,0 +1,536 @@
+---
+title: TranslationFile
+description: Represents and manages Laravel translation files with read, write, and comparison capabilities
+---
+
+## Overview
+
+The `TranslationFile` class represents a single Laravel translation file. It provides methods for loading, saving, comparing, and manipulating translation data in both PHP array and JSON formats.
+
+**Namespace**: `Mateffy\AiTranslations`
+
+## Class Definition
+
+```php
+namespace Mateffy\AiTranslations;
+
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\File;
+
+class TranslationFile
+{
+    public function __construct(
+        public readonly string $language,
+        public readonly string $domain,
+        public array $translations,
+        protected readonly string $basePath,
+    ) {}
+}
+```
+
+## Constructor
+
+```php
+public function __construct(
+    string $language,
+    string $domain,
+    array $translations,
+    string $basePath,
+)
+```
+
+<ParamField path="language" type="string" required>
+  The language code (e.g., `'en'`, `'es'`, `'fr'`)
+</ParamField>
+
+<ParamField path="domain" type="string" required>
+  The translation domain/file name (e.g., `'validation'`, `'auth'`, `'messages'`)
+</ParamField>
+
+<ParamField path="translations" type="array" required>
+  The translations array (can be nested)
+</ParamField>
+
+<ParamField path="basePath" type="string" required>
+  The base path to the language directory (typically `lang_path()`)
+</ParamField>
+
+## Properties
+
+<ResponseField name="language" type="string" readonly>
+  The language code for this translation file
+</ResponseField>
+
+<ResponseField name="domain" type="string" readonly>
+  The domain/file name for this translation file
+</ResponseField>
+
+<ResponseField name="translations" type="array">
+  The translations array (mutable)
+</ResponseField>
+
+<ResponseField name="basePath" type="string" readonly>
+  The base directory path for language files
+</ResponseField>
+
+## Static Methods
+
+### path()
+
+Generates the file path for a translation file.
+
+```php
+public static function path(
+    string $language,
+    string $domain,
+    string $basePath,
+): string
+```
+
+<ParamField path="language" type="string" required>
+  The language code
+</ParamField>
+
+<ParamField path="domain" type="string" required>
+  The translation domain
+</ParamField>
+
+<ParamField path="basePath" type="string" required>
+  The base language directory path
+</ParamField>
+
+<ResponseField name="string" type="string">
+  The full file path (e.g., `/path/to/lang/es/validation.php`)
+</ResponseField>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+$path = TranslationFile::path('es', 'validation', lang_path());
+// Returns: "/path/to/app/lang/es/validation.php"
+```
+
+---
+
+### load()
+
+Loads a translation file from disk.
+
+```php
+public static function load(
+    string $language,
+    string $domain,
+    ?string $basePath = null,
+): static
+```
+
+<ParamField path="language" type="string" required>
+  The language code to load
+</ParamField>
+
+<ParamField path="domain" type="string" required>
+  The translation domain to load
+</ParamField>
+
+<ParamField path="basePath" type="?string" default="null">
+  Optional base path. Defaults to `lang_path()` if not provided
+</ParamField>
+
+<ResponseField name="TranslationFile" type="static">
+  A new TranslationFile instance. Returns an empty instance if the file doesn't exist.
+</ResponseField>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+// Load existing file
+$file = TranslationFile::load('en', 'validation');
+
+// Load from custom path
+$file = TranslationFile::load('es', 'messages', '/custom/lang/path');
+
+// Load non-existent file (returns empty instance)
+$newFile = TranslationFile::load('fr', 'newdomain');
+```
+
+---
+
+### flatten()
+
+Flattens a nested array into dot-notated keys (without values).
+
+```php
+public static function flatten(array $array, string $prefix = ""): array
+```
+
+<ParamField path="array" type="array" required>
+  The nested array to flatten
+</ParamField>
+
+<ParamField path="prefix" type="string" default="''">
+  Optional prefix for the keys
+</ParamField>
+
+<ResponseField name="array" type="array<int, string>">
+  An indexed array of dot-notated keys
+</ResponseField>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+$nested = [
+    'auth' => [
+        'failed' => 'These credentials do not match our records.',
+        'throttle' => 'Too many login attempts.'
+    ],
+    'welcome' => 'Welcome!'
+];
+
+$flattened = TranslationFile::flatten($nested);
+// Result: ['auth.failed', 'auth.throttle', 'welcome']
+```
+
+---
+
+### flattenWithValues()
+
+Flattens a nested array into dot-notated key-value pairs.
+
+```php
+public static function flattenWithValues(
+    array $array,
+    string $prefix = "",
+): array
+```
+
+<ParamField path="array" type="array" required>
+  The nested array to flatten
+</ParamField>
+
+<ParamField path="prefix" type="string" default="''">
+  Optional prefix for the keys
+</ParamField>
+
+<ResponseField name="array" type="array<string, string>">
+  An associative array with dot-notated keys and their values
+</ResponseField>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+$nested = [
+    'validation' => [
+        'required' => 'The :attribute field is required.',
+        'email' => 'The :attribute must be a valid email.'
+    ]
+];
+
+$flattened = TranslationFile::flattenWithValues($nested);
+// Result: [
+//   'validation.required' => 'The :attribute field is required.',
+//   'validation.email' => 'The :attribute must be a valid email.'
+// ]
+```
+
+## Instance Methods
+
+### toJson()
+
+Converts translations to JSON format with dot-notated keys.
+
+```php
+public function toJson(): string
+```
+
+<ResponseField name="string" type="string">
+  Pretty-printed JSON string with dot-notated keys. Returns `"{}"` for empty translations.
+</ResponseField>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+$file = TranslationFile::load('en', 'auth');
+$json = $file->toJson();
+
+// Output:
+// {
+//   "auth.failed": "These credentials do not match our records.",
+//   "auth.throttle": "Too many login attempts."
+// }
+```
+
+---
+
+### toPhpArray()
+
+Converts translations to PHP array format suitable for Laravel language files.
+
+```php
+public function toPhpArray(): string
+```
+
+<ResponseField name="string" type="string">
+  A string containing PHP code with a properly formatted array declaration
+</ResponseField>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+$file = TranslationFile::load('en', 'validation');
+$php = $file->toPhpArray();
+
+// Output:
+// <?php
+//
+// return [
+//     'required' => "The :attribute field is required.",
+//     'email' => "The :attribute must be a valid email address.",
+// ];
+```
+
+---
+
+### get()
+
+Retrieves a translation value by its dot-notated key.
+
+```php
+public function get(string $key): ?string
+```
+
+<ParamField path="key" type="string" required>
+  The dot-notated key to retrieve (e.g., `'validation.required'`)
+</ParamField>
+
+<ResponseField name="string|null" type="?string">
+  The translation value, or `null` if not found
+</ResponseField>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+$file = TranslationFile::load('en', 'validation');
+
+$value = $file->get('validation.required');
+// "The :attribute field is required."
+
+$missing = $file->get('validation.nonexistent');
+// null
+```
+
+---
+
+### set()
+
+Sets a translation value using dot notation.
+
+```php
+public function set(string $key, string|array $value): void
+```
+
+<ParamField path="key" type="string" required>
+  The dot-notated key to set
+</ParamField>
+
+<ParamField path="value" type="string|array" required>
+  The translation value. If an array, it will be flattened and each key will be set relative to the provided key.
+</ParamField>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+$file = TranslationFile::load('es', 'validation');
+
+// Set a single value
+$file->set('validation.required', 'El campo :attribute es obligatorio.');
+
+// Set multiple nested values
+$file->set('auth', [
+    'failed' => 'Estas credenciales no coinciden.',
+    'throttle' => 'Demasiados intentos.'
+]);
+```
+
+---
+
+### compare()
+
+Compares this translation file with another to find missing keys.
+
+```php
+public function compare(TranslationFile $file): array
+```
+
+<ParamField path="file" type="TranslationFile" required>
+  The translation file to compare against
+</ParamField>
+
+<ResponseField name="array" type="array<int, string>">
+  An array of dot-notated keys that exist in this file but are missing from the compared file
+</ResponseField>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+$english = TranslationFile::load('en', 'validation');
+$spanish = TranslationFile::load('es', 'validation');
+
+$missingKeys = $english->compare($spanish);
+
+// Result: ['validation.custom', 'validation.attributes.email']
+foreach ($missingKeys as $key) {
+    echo "Missing: {$key}\n";
+}
+```
+
+---
+
+### apply()
+
+Applies a set of translations to this file.
+
+```php
+public function apply(array $translations): self
+```
+
+<ParamField path="translations" type="array" required>
+  An associative array of dot-notated keys and their translation values
+</ParamField>
+
+<ResponseField name="self" type="TranslationFile">
+  Returns the current instance for method chaining
+</ResponseField>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+$file = TranslationFile::load('fr', 'auth');
+
+$newTranslations = [
+    'auth.failed' => 'Ces identifiants ne correspondent pas.',
+    'auth.throttle' => 'Trop de tentatives.'
+];
+
+$file->apply($newTranslations)->write();
+```
+
+---
+
+### write()
+
+Writes the translation file to disk in PHP array format.
+
+```php
+public function write(): void
+```
+
+<Note>
+  This method automatically creates the directory structure if it doesn't exist.
+</Note>
+
+#### Example
+
+```php
+use Mateffy\AiTranslations\TranslationFile;
+
+$file = TranslationFile::load('de', 'messages');
+$file->set('welcome', 'Willkommen!');
+$file->set('goodbye', 'Auf Wiedersehen!');
+$file->write();
+
+// Creates/updates: lang/de/messages.php
+```
+
+## Complete Usage Example
+
+<CodeGroup>
+```php Loading and Modifying
+use Mateffy\AiTranslations\TranslationFile;
+
+// Load existing translation file
+$file = TranslationFile::load('es', 'validation');
+
+// Get a specific translation
+$required = $file->get('validation.required');
+
+// Add new translations
+$file->set('validation.custom_rule', 'Este campo no es válido.');
+
+// Save changes
+$file->write();
+```
+
+```php Comparing Files
+use Mateffy\AiTranslations\TranslationFile;
+
+// Load source and target files
+$source = TranslationFile::load('en', 'auth');
+$target = TranslationFile::load('fr', 'auth');
+
+// Find missing keys
+$missing = $source->compare($target);
+
+if (count($missing) > 0) {
+    echo "Missing translations: " . implode(', ', $missing);
+}
+```
+
+```php Creating New Files
+use Mateffy\AiTranslations\TranslationFile;
+
+// Create a new translation file
+$newFile = new TranslationFile(
+    language: 'it',
+    domain: 'messages',
+    translations: [
+        'welcome' => 'Benvenuto!',
+        'goodbye' => 'Arrivederci!'
+    ],
+    basePath: lang_path()
+);
+
+// Save to disk
+$newFile->write();
+// Creates: lang/it/messages.php
+```
+
+```php Working with Nested Arrays
+use Mateffy\AiTranslations\TranslationFile;
+
+$file = TranslationFile::load('en', 'validation');
+
+// Get flattened keys (for comparison)
+$allKeys = TranslationFile::flatten($file->translations);
+
+// Get flattened key-value pairs (for AI processing)
+$flatData = TranslationFile::flattenWithValues($file->translations);
+
+// Convert to JSON for AI consumption
+$json = $file->toJson();
+```
+</CodeGroup>
+
+## Related Classes
+
+- [Translator](/api/classes/translator) - Orchestrates translation workflows using TranslationFile
+- [TranslationAgent](/api/classes/translation-agent) - Processes translations using AI

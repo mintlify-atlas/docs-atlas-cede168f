@@ -1,0 +1,330 @@
+---
+title: 'How It Works'
+description: 'Understanding the architecture and translation flow of AI Translations for Laravel'
+---
+
+## Overview
+
+AI Translations for Laravel uses a sophisticated architecture that combines PHP language file parsing, intelligent chunking, and LLM-powered translation to maintain high-quality, context-aware translations across your Laravel application.
+
+## Architecture Components
+
+The package consists of three core components that work together:
+
+### 1. TranslationFile
+
+The `TranslationFile` class is responsible for reading and writing Laravel's PHP language files.
+
+**Key responsibilities:**
+- Loads existing PHP array-based translation files from disk
+- Converts nested PHP arrays into flat dot-notation for LLM processing
+- Merges translated keys back into the nested structure
+- Writes updated translations back to PHP files
+
+```php
+// Loading a translation file
+$file = TranslationFile::load('en', 'validation');
+
+// Converts nested arrays to flat dot notation
+// ['auth' => ['failed' => 'Invalid credentials']]
+// becomes: ['auth.failed' => 'Invalid credentials']
+$json = $file->toJson();
+```
+
+**File structure handling:**
+- Reads: `/lang/{language}/{domain}.php`
+- Returns empty array if file doesn't exist (for new languages)
+- Preserves nested array structure when writing back
+
+<Note>
+The `TranslationFile` class uses `flatten()` to convert nested arrays to dot notation for the LLM, and `apply()` to merge translations back using Laravel's `Arr::set()` helper.
+</Note>
+
+### 2. TranslationAgent
+
+The `TranslationAgent` extends NeuronAI's Agent class and orchestrates the LLM interaction.
+
+**Configuration (TranslationAgent.php:17-22):**
+```php
+public function __construct(
+    protected TranslationFile $from,    // Source language file
+    protected TranslationFile $to,      // Target language file
+    protected bool $fast = false,       // Use fast/slow model
+    public readonly int $chunkSize = 35 // Keys per chunk
+) {}
+```
+
+**Provider support:**
+- OpenAI (GPT-4, GPT-3.5)
+- Anthropic (Claude)
+- Google Gemini
+- Configurable model selection for speed vs accuracy
+
+**LLM Instructions:**
+The agent provides detailed system prompts that:
+- Define the translation task and target languages
+- Instruct the LLM to use existing translations as context
+- Require flat dot-notation output format
+- Prevent escaping unicode characters
+- Ensure proper quote escaping in translations
+
+<Tip>
+The package supports both fast and standard models. Use `--fast` flag for quicker translations during development, and standard models for production-quality translations.
+</Tip>
+
+### 3. Translator
+
+The `Translator` class manages the overall translation workflow and retry logic.
+
+**Core workflow (Translator.php:40-96):**
+```php
+public function translate(
+    TranslationFile $from,
+    TranslationFile $to,
+    array $missingKeys,
+    bool $fast = false,
+    ?Closure $progress = null,
+): array
+```
+
+## Translation Flow
+
+Here's how the complete translation process works:
+
+<Steps>
+  <Step title="Load Translation Files">
+    Both source and target `TranslationFile` objects are loaded. If the target file doesn't exist, an empty structure is created.
+  </Step>
+  
+  <Step title="Identify Missing Keys">
+    The `compare()` method identifies which translation keys exist in the source but are missing in the target.
+    
+    ```php
+    // TranslationFile.php:84-90
+    public function compare(TranslationFile $file): array
+    {
+        $flatKeys = static::flatten($this->translations);
+        $flatFileKeys = static::flatten($file->translations);
+        return array_diff($flatKeys, $flatFileKeys);
+    }
+    ```
+  </Step>
+  
+  <Step title="Chunk Missing Keys">
+    Missing keys are split into chunks of 35 keys (configurable) to avoid overwhelming the LLM and stay within token limits.
+    
+    ```php
+    // TranslationAgent.php:97-99
+    $missing_chunks = collect($missing)
+        ->values()
+        ->chunk($this->chunkSize);
+    ```
+  </Step>
+  
+  <Step title="Provide Full Context to LLM">
+    For the **first chunk only**, both complete files are sent to provide context:
+    
+    ```php
+    // TranslationAgent.php:143-156
+    $message = ($retry || $index > 0) 
+        ? new UserMessage($prompt)  // Subsequent chunks
+        : new UserMessage(<<<PROMPT  // First chunk only
+        <{$this->from->language}-file>
+        {$this->from->toJson()}
+        </{$this->from->language}-file>
+
+        <{$this->to->language}-file>
+        {$this->to->toJson()}
+        </{$this->to->language}-file>
+
+        {$prompt}
+        PROMPT);
+    ```
+    
+    This maintains conversation context across chunks without repeatedly sending full files.
+  </Step>
+  
+  <Step title="Generate Structured Output">
+    The LLM returns translations in a strict JSON schema format:
+    
+    ```json
+    {
+      "translations": {
+        "validation.required": "This field is required",
+        "validation.email": "Must be a valid email",
+        "auth.failed": "Invalid credentials"
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Validate and Flatten">
+    If the LLM accidentally returns nested arrays, they're automatically flattened:
+    
+    ```php
+    // Translator.php:67-75
+    $hasNestedTranslations = collect($translations)->some(
+        fn($value) => is_array($value)
+    );
+
+    if ($hasNestedTranslations) {
+        $translations = TranslationFile::flattenWithValues($translations);
+    }
+    ```
+  </Step>
+  
+  <Step title="Merge Translations">
+    Translated keys are merged into the target file using dot notation:
+    
+    ```php
+    // TranslationFile.php:92-99
+    public function apply(array $translations): self
+    {
+        foreach ($translations as $key => $value) {
+            $this->set($key, $value);  // Uses Arr::set()
+        }
+        return $this;
+    }
+    ```
+  </Step>
+  
+  <Step title="Verify Completion">
+    After each chunk, the system checks if all keys were translated. Missing keys trigger a retry (up to 3 attempts).
+  </Step>
+  
+  <Step title="Write to Disk">
+    The updated nested PHP array structure is written back to the language file:
+    
+    ```php
+    // TranslationFile.php:101-107
+    public function write(): void
+    {
+        $path = static::path($this->language, $this->domain, $this->basePath);
+        File::ensureDirectoryExists(dirname($path));
+        File::put($path, $this->toPhpArray());
+    }
+    ```
+  </Step>
+</Steps>
+
+## Selective Updates
+
+One of the key features is **selective updating** - the ability to update only missing or changed translations without regenerating the entire file.
+
+<AccordionGroup>
+  <Accordion title="How selective updates work">
+    1. **Compare** source and target files to find missing keys
+    2. **Send full context** (both complete files) to the LLM
+    3. **Receive only missing translations** in dot notation
+    4. **Merge** new translations into existing structure
+    5. **Preserve** all existing translations unchanged
+    
+    This approach ensures:
+    - Existing UI text remains stable
+    - Only outdated translations are updated
+    - New features get translated without affecting old ones
+    - Translation history is preserved
+  </Accordion>
+  
+  <Accordion title="Full file translation">
+    When translating to a completely new language:
+    1. Target file is empty (or doesn't exist)
+    2. ALL source keys become "missing keys"
+    3. LLM translates entire file in chunks
+    4. All chunks are merged to create complete target file
+    
+    ```bash
+    # Translate everything to a new language
+    php artisan translate --language=ja
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Data Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Load Files                                               │
+│    en/validation.php → TranslationFile (source)            │
+│    de/validation.php → TranslationFile (target)            │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 2. Compare & Identify                                       │
+│    Missing: ['validation.custom', 'validation.uuid']       │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Chunk Keys (35 per chunk)                                │
+│    Chunk 1: [key1...key35]                                  │
+│    Chunk 2: [key36...key70]                                 │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 4. Send to LLM (with full context for chunk 1)             │
+│    - Full source file (JSON)                                │
+│    - Full target file (JSON)                                │
+│    - Missing keys list                                      │
+│    - Translation instructions                               │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 5. Receive Structured Response                              │
+│    {"translations": {"key.path": "Übersetzung"}}            │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 6. Merge & Validate                                         │
+│    - Flatten if nested                                      │
+│    - Check all keys present                                 │
+│    - Retry if missing (max 3 times)                         │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 7. Write to Disk                                            │
+│    de/validation.php ← Updated nested PHP array             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Key Design Decisions
+
+<CardGroup cols={2}>
+  <Card title="Dot Notation" icon="dots">
+    Using flat dot notation (`auth.failed`) instead of nested arrays makes LLM responses more reliable and easier to validate with JSON schemas.
+  </Card>
+  
+  <Card title="Chunking" icon="layer-group">
+    Processing 35 keys at a time balances token efficiency with translation quality, preventing context window overflow.
+  </Card>
+  
+  <Card title="Full Context" icon="book-open">
+    Sending complete source and target files ensures the LLM understands existing terminology and maintains consistency.
+  </Card>
+  
+  <Card title="Retry Logic" icon="rotate">
+    Up to 3 automatic retries ensure all keys are translated, handling LLM inconsistencies gracefully.
+  </Card>
+</CardGroup>
+
+## Performance Considerations
+
+<Info>
+**Token optimization:** Only the first chunk receives full file context. Subsequent chunks in the same translation session continue the conversation, relying on the LLM's context window to remember the full files.
+</Info>
+
+**Typical performance:**
+- Small file (50 keys): ~10-30 seconds
+- Medium file (200 keys): ~1-2 minutes  
+- Large file (500+ keys): ~3-5 minutes
+
+Performance depends on:
+- LLM provider and model speed
+- Number of missing keys
+- Network latency
+- Chunk size configuration

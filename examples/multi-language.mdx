@@ -1,0 +1,357 @@
+---
+title: 'Multi-Language Translation'
+description: 'Translate to multiple languages simultaneously with a single command'
+icon: 'globe'
+---
+
+Translate your Laravel application to multiple languages at once, saving time and ensuring consistency across all your supported languages.
+
+## Translating to All Languages
+
+By default, running `translate` without the `--language` option translates to all languages configured in your project.
+
+### Setup: Define Your Languages
+
+First, ensure your `config/ai-translations.php` lists your supported languages:
+
+```php config/ai-translations.php
+<?php
+
+return [
+    'languages' => ['en', 'es', 'fr', 'de', 'it', 'pl', 'pt'],
+];
+```
+
+### Translate Everything
+
+Run the command without specifying a language:
+
+```bash
+php artisan translate --name=messages
+```
+
+**Output:**
+
+```bash
+AI Translator
+Source: en
+Languages: es, fr, de, it, pl, pt
+Domains: messages
+
+Translating from en to es: messages
+5 missing keys found: welcome, goodbye, dashboard.title, dashboard.stats, settings.profile
+
+Translating in 1 chunks... (attempt #1 of 3)
+████████████████████ 100%
+
+Generated translations for messages from en to es:
+welcome: "Bienvenido a nuestra aplicación"
+goodbye: "Gracias por usar nuestro servicio"
+dashboard.title: "Panel de Control"
+...
+
+Writing translations for messages from en to es
+
+Translating from en to fr: messages
+5 missing keys found: welcome, goodbye, dashboard.title, dashboard.stats, settings.profile
+
+Translating in 1 chunks... (attempt #1 of 3)
+████████████████████ 100%
+
+Generated translations for messages from en to fr:
+welcome: "Bienvenue dans notre application"
+goodbye: "Merci d'utiliser notre service"
+dashboard.title: "Tableau de bord"
+...
+
+Writing translations for messages from en to fr
+
+# Continues for de, it, pl, pt...
+```
+
+## Translating to Specific Languages
+
+Use the `--language` option to translate to specific languages only.
+
+### Single Language
+
+```bash
+php artisan translate --language=es
+```
+
+### Multiple Languages (Comma-Separated)
+
+```bash
+php artisan translate --language=es,fr,de
+```
+
+**Output:**
+
+```bash
+AI Translator
+Source: en
+Languages: es, fr, de
+Domains: auth, validation, messages
+
+Translating from en to es: auth
+Translating from en to es: validation
+Translating from en to es: messages
+
+Translating from en to fr: auth
+Translating from en to fr: validation
+Translating from en to fr: messages
+
+Translating from en to de: auth
+Translating from en to de: validation
+Translating from en to de: messages
+```
+
+<Note>
+  When translating multiple files to multiple languages, the command processes each file for each language sequentially, ensuring consistent context.
+</Note>
+
+## Skipping Languages
+
+Use `--skip-languages` to exclude specific languages from translation:
+
+```bash
+php artisan translate --skip-languages=es,fr
+```
+
+This translates to all configured languages except Spanish and French.
+
+**Example Use Case:** You've manually edited Spanish and French translations and don't want them overwritten.
+
+## Translating Multiple Files
+
+Combine multi-language translation with multiple files for maximum efficiency.
+
+### Translate All Files to All Languages
+
+```bash
+php artisan translate
+```
+
+This translates all files in your source language directory to all configured languages.
+
+### Translate Specific Files to Multiple Languages
+
+```bash
+php artisan translate --name=auth,validation,messages --language=es,fr,de
+```
+
+**Output:**
+
+```bash
+AI Translator
+Source: en
+Languages: es, fr, de
+Domains: auth, validation, messages
+
+# Translates:
+# - auth.php to es, fr, de
+# - validation.php to es, fr, de  
+# - messages.php to es, fr, de
+```
+
+### Skip Specific Files
+
+```bash
+php artisan translate --skip-names=validation
+```
+
+Translates all files except `validation.php`.
+
+## Changing the Source Language
+
+By default, the source language is your application's locale (`config('app.locale')`). You can specify a different source language:
+
+```bash
+php artisan translate --base-language=de --language=en,es,fr
+```
+
+This translates from German to English, Spanish, and French.
+
+<CodeGroup>
+  ```bash Example: German to English
+  php artisan translate --base-language=de --language=en
+  ```
+
+  ```bash Example: Spanish to Portuguese
+  php artisan translate --base-language=es --language=pt
+  ```
+
+  ```bash Example: French to Multiple Languages
+  php artisan translate --base-language=fr --language=en,de,it
+  ```
+</CodeGroup>
+
+## Complete Example: Multi-Language Workflow
+
+Here's a complete workflow for managing translations across multiple languages:
+
+<Steps>
+  <Step title="Validate All Languages">
+    First, check which languages need updates:
+
+    ```bash
+    php artisan translate:validate
+    ```
+
+    **Output:**
+
+    ```bash
+    Checking translations...
+    Source: en
+    Languages: es, fr, de, it, pl, pt
+    Domains: auth, validation, messages
+
+    +------------------+--------------+
+    | Domain           | Missing Keys |
+    +------------------+--------------+
+    | de/auth          | ✔            |
+    | de/messages      | 3            |
+    | de/validation    | ✔            |
+    | es/auth          | ✔            |
+    | es/messages      | 3            |
+    | es/validation    | ✔            |
+    | fr/auth          | ✔            |
+    | fr/messages      | 3            |
+    | fr/validation    | ✔            |
+    | it/auth          | –            |
+    | it/messages      | –            |
+    | it/validation    | –            |
+    | pl/auth          | ✔            |
+    | pl/messages      | 5            |
+    | pl/validation    | ✔            |
+    | pt/auth          | –            |
+    | pt/messages      | –            |
+    | pt/validation    | –            |
+    +------------------+--------------+
+    ```
+
+    <Note>
+      `–` indicates the file doesn't exist yet for that language.
+    </Note>
+  </Step>
+
+  <Step title="Translate All Missing Keys">
+    Update all languages at once:
+
+    ```bash
+    php artisan translate
+    ```
+
+    This will:
+    - Translate missing keys in `de/messages`, `es/messages`, `fr/messages`, `pl/messages`
+    - Create new files for `it/*` and `pt/*`
+  </Step>
+
+  <Step title="Validate Again">
+    Confirm all translations are complete:
+
+    ```bash
+    php artisan translate:validate
+    ```
+
+    **Output:**
+
+    ```bash
+    +------------------+--------------+
+    | Domain           | Missing Keys |
+    +------------------+--------------+
+    | de/auth          | ✔            |
+    | de/messages      | ✔            |
+    | de/validation    | ✔            |
+    | es/auth          | ✔            |
+    | es/messages      | ✔            |
+    | es/validation    | ✔            |
+    | fr/auth          | ✔            |
+    | fr/messages      | ✔            |
+    | fr/validation    | ✔            |
+    | it/auth          | ✔            |
+    | it/messages      | ✔            |
+    | it/validation    | ✔            |
+    | pl/auth          | ✔            |
+    | pl/messages      | ✔            |
+    | pl/validation    | ✔            |
+    | pt/auth          | ✔            |
+    | pt/messages      | ✔            |
+    | pt/validation    | ✔            |
+    +------------------+--------------+
+    ```
+  </Step>
+</Steps>
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Use --fast for development">
+    When translating to many languages during development, use `--fast` to speed up the process:
+    
+    ```bash
+    php artisan translate --fast
+    ```
+    
+    This uses a faster LLM model. For production, run without `--fast` for higher quality.
+  </Accordion>
+
+  <Accordion title="Translate incrementally">
+    Instead of translating everything at once, translate file by file:
+    
+    ```bash
+    php artisan translate --name=messages
+    php artisan translate --name=auth
+    php artisan translate --name=validation
+    ```
+    
+    This gives you more control and allows you to validate each file before moving to the next.
+  </Accordion>
+
+  <Accordion title="CI/CD integration">
+    Add a validation step to your CI/CD pipeline:
+    
+    ```yaml .github/workflows/translations.yml
+    - name: Validate translations
+      run: php artisan translate:validate
+    ```
+    
+    This ensures PRs don't introduce missing translations.
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Options Combination
+
+Combine options for powerful workflows:
+
+```bash
+php artisan translate \
+  --name=messages,auth \
+  --language=es,fr,de \
+  --base-language=en \
+  --skip-languages=fr \
+  --fast
+```
+
+This command:
+- Translates `messages.php` and `auth.php`
+- From English
+- To Spanish and German (skipping French)
+- Using the fast model
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Basic Translation" icon="language" href="/examples/basic-translation">
+    Learn the basics of translating files
+  </Card>
+  <Card title="Partial Updates" icon="arrows-rotate" href="/examples/partial-updates">
+    Update only missing keys in existing files
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Configure language settings and LLM providers
+  </Card>
+  <Card title="Validation" icon="check" href="/api/commands/validate">
+    Learn more about translation validation
+  </Card>
+</CardGroup>
